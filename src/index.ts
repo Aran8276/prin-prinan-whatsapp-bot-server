@@ -5,8 +5,8 @@ import pkg from "whatsapp-web.js";
 const { Client, LocalAuth, MessageMedia } = pkg;
 
 const PRICING = {
-  COLOR: 1000,
-  BLACK_WHITE: 500,
+  COLOR: 2000,
+  BLACK_WHITE: 1500,
 };
 
 type FileData = {
@@ -29,7 +29,7 @@ const greetedUsers = new Set<string>();
 export const client = new Client({
   authStrategy: new LocalAuth({ clientId: "your-client-id" }),
   puppeteer: {
-    headless: false,
+    headless: true,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -74,20 +74,16 @@ const validateConfig = (text: string) => {
   return text;
 };
 
-const getFileTypeDisplay = (mime: string) => {
-  switch (mime) {
-    case "application/pdf":
-      return "Dokumen PDF 📄";
-    case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
-      return "Dokumen DOCX 📄";
-    case "image/jpeg":
-      return "Gambar JPEG 🖼️";
-    case "image/png":
-      return "Gambar PNG 🖼️";
-    case "image/tiff":
-      return "Gambar TIFF 🖼️";
+const mapConfigToApiValue = (config?: string) => {
+  switch (config) {
+    case "FULL_COLOR":
+      return "color";
+    case "BLACK_WHITE":
+      return "bnw";
+    case "AUTO_DETECT":
+      return "auto";
     default:
-      return "File Diterima 📁";
+      return config || "bnw";
   }
 };
 
@@ -226,14 +222,13 @@ client.on("message_create", async (msg) => {
           config: validConfig || undefined,
         });
 
-        const fileTypeDisplay = getFileTypeDisplay(attachmentData.mimetype);
         const confirmationText = validConfig
           ? `Warna Dokumen: *${formatConfigDisplay(validConfig)}*`
           : `Warna Dokumen: Pilih Nanti ⌨️`;
 
         await client.sendMessage(
           chatId,
-          `${fileTypeDisplay} Diterima:\n\n\`${fileName}\`\n\n${confirmationText}\n` +
+          `File Diterima:\n\n\`${fileName}\`\n\n${confirmationText}\n` +
             `Total: *${session.files.length} file.*\n\n` +
             `👉 Silakan kirim file lain.\n👉 Ketik *2* jika selesai.`,
         );
@@ -292,6 +287,35 @@ client.on("message_create", async (msg) => {
   }
 });
 
+async function createPrintJob(session: UserState, chatId: string) {
+  const formData = new FormData();
+  formData.append("customer_name", session.customerName || "N/A");
+  formData.append("customer_number", chatId.split("@")[0]);
+
+  session.files.forEach((file, index) => {
+    formData.append(`items[${index}][file]`, file.data);
+    formData.append(`items[${index}][color]`, mapConfigToApiValue(file.config));
+  });
+
+  const url = process.env.LARAVEL_URL + "api/print-job";
+  const response = await fetch(url, {
+    method: "POST",
+    body: formData,
+    headers: {
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json();
+    throw new Error(
+      `API Error: ${response.status} ${response.statusText} - ${JSON.stringify(errorData)}`,
+    );
+  }
+
+  return await response.json();
+}
+
 async function finalizeOrder(chatId: string, session: UserState) {
   const firstUnsetIndex = session.files.findIndex((f) => !f.config);
   if (firstUnsetIndex === -1) {
@@ -317,15 +341,12 @@ async function promptForUnsetConfig(chatId: string, session: UserState) {
   ].includes(fileToConfig.mime);
 
   const colorOption = isDocument
-    ? "- `hitam` (cetak Hitam Putih ⬛⬜)\n" +
-      "- `warna` (cetak Full Color 🌈)\n" +
-      "- `1-5` (Halaman `1-5` Hitam Putih, sisanya warna 🔢)\n"
-    : "- `hitam` (cetak Hitam Putih ⬛⬜)\n" +
-      "- `warna` (cetak Full Color 🌈)\n";
+    ? "- `hitam`, `warna`, `auto`\n- atau range halaman (cth: `1-5`)\n"
+    : "- `hitam`, `warna`, `auto`\n";
 
   await client.sendMessage(
     chatId,
-    `⚙️ Pilih Warna Cetakan (Tipe File: ${getFileTypeDisplay(fileToConfig.mime)}):\n\n\`${fileToConfig.filename}\`\n\n` +
+    `⚙️ Pilih Warna Cetakan untuk file:\n\n\`${fileToConfig.filename}\`\n\n` +
       `Ketik:\n` +
       colorOption,
   );
@@ -341,7 +362,14 @@ async function generateSummaryAndQr(chatId: string, session: UserState) {
   await client.sendMessage(chatId, invoiceMessage);
 
   try {
-    const qrDataUrl = await QRCode.toDataURL("Hello world", {
+    const apiResponse = await createPrintJob(session, chatId);
+    const orderId = apiResponse.order_id;
+
+    if (!orderId) {
+      throw new Error("Order ID not found in API response.");
+    }
+
+    const qrDataUrl = await QRCode.toDataURL(orderId, {
       errorCorrectionLevel: "M",
       margin: 2,
       width: 400,
@@ -361,19 +389,26 @@ async function generateSummaryAndQr(chatId: string, session: UserState) {
     });
 
     console.log({
-      event: "ORDER_GENERATED",
+      event: "ORDER_CREATED_VIA_API",
       timestamp: new Date().toISOString(),
       chatId: chatId,
+      orderId: orderId,
       payload: {
         user: chatId.replace("@c.us", ""),
         customerName: session.customerName,
-        items: session.files,
+        items: session.files.map((f) => ({
+          filename: f.filename,
+          config: f.config,
+        })),
         expires: Date.now() + 48 * 60 * 60 * 1000,
       },
     });
   } catch (error) {
-    console.error("Error generating QR:", error);
-    await client.sendMessage(chatId, "❌ Gagal membuat QR. Silakan coba lagi.");
+    console.error("Error creating print job:", error);
+    await client.sendMessage(
+      chatId,
+      "❌ Gagal membuat pesanan di sistem. Mohon coba lagi atau hubungi admin.",
+    );
   }
 
   delete userSessions[chatId];
