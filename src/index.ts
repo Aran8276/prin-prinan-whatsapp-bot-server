@@ -4,6 +4,11 @@ import qrcodeTerminal from "qrcode-terminal";
 import pkg from "whatsapp-web.js";
 const { Client, LocalAuth, MessageMedia } = pkg;
 
+const PRICING = {
+  COLOR: 1000,
+  BLACK_WHITE: 500,
+};
+
 type FileData = {
   filename: string;
   mime: string;
@@ -12,9 +17,9 @@ type FileData = {
 };
 
 type UserState = {
-  step: "AWAITING_FILES" | "CONFIGURING_UNSET_FILES";
+  step: "AWAITING_NAME" | "AWAITING_FILES" | "CONFIGURING_UNSET_FILES";
   files: FileData[];
-
+  customerName?: string;
   configIndex?: number;
 };
 
@@ -24,7 +29,7 @@ const greetedUsers = new Set<string>();
 export const client = new Client({
   authStrategy: new LocalAuth({ clientId: "your-client-id" }),
   puppeteer: {
-    headless: true,
+    headless: false,
     args: [
       "--no-sandbox",
       "--disable-setuid-sandbox",
@@ -69,12 +74,61 @@ const validateConfig = (text: string) => {
   return text;
 };
 
+const getFileTypeDisplay = (mime: string) => {
+  switch (mime) {
+    case "application/pdf":
+      return "Dokumen PDF 📄";
+    case "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+      return "Dokumen DOCX 📄";
+    case "image/jpeg":
+      return "Gambar JPEG 🖼️";
+    case "image/png":
+      return "Gambar PNG 🖼️";
+    case "image/tiff":
+      return "Gambar TIFF 🖼️";
+    default:
+      return "File Diterima 📁";
+  }
+};
+
 const formatConfigDisplay = (config?: string) => {
   if (!config) return "Belum Diatur ⚠️";
   if (config === "FULL_COLOR") return "Full Color 🌈";
   if (config === "BLACK_WHITE") return "Full Hitam Putih ⬛⬜";
   if (config === "AUTO_DETECT") return "Deteksi Otomatis 🤖";
   return `Hitam Putih (Halaman: ${config}) 📄`;
+};
+
+const getItemPrice = (config?: string) => {
+  return config === "FULL_COLOR" ? PRICING.COLOR : PRICING.BLACK_WHITE;
+};
+
+const generateInvoice = (session: UserState) => {
+  const invoiceId = `INV-${Date.now()}`;
+  const customerName = session.customerName || "Pelanggan";
+  let totalPrice = 0;
+
+  const items = session.files
+    .map((file, index) => {
+      const price = getItemPrice(file.config);
+      totalPrice += price;
+      const formattedPrice = `Rp${price.toLocaleString("id-ID")}`;
+      return `${index + 1}. \`${file.filename}\`\n   - Pengaturan: *${formatConfigDisplay(file.config)}*\n   - Biaya: *${formattedPrice}*`;
+    })
+    .join("\n\n");
+
+  const totalFormatted = `Rp${totalPrice.toLocaleString("id-ID")}`;
+
+  return (
+    `🧾 *INVOICE PESANAN ANDA*\n\n` +
+    `Nomor Invoice: *${invoiceId}*\n` +
+    `Nama Pemesan: *${customerName}*\n` +
+    `Tanggal: *${new Date().toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" })}*\n` +
+    `-----------------------------------\n` +
+    `${items}\n` +
+    `-----------------------------------\n` +
+    `*TOTAL BIAYA: ${totalFormatted}*`
+  );
 };
 
 client.on("message_create", async (msg) => {
@@ -111,21 +165,12 @@ client.on("message_create", async (msg) => {
 
   if (!session) {
     if (lowerText === "!print" || lowerText === "!p") {
-      userSessions[chatId] = { step: "AWAITING_FILES", files: [] };
+      userSessions[chatId] = { step: "AWAITING_NAME", files: [] };
       await chat.archive();
       await client.sendMessage(
         chatId,
-        "📄 Kirim file Anda dengan *teks/caption* untuk pengaturan cetak.\n" +
-          "👉 Format file yang didukung: *PDF, JPEG, JPG, PNG*\n\n" +
-          "Contoh Teks Caption untuk PDF:\n" +
-          "- `hitam` (cetak Hitam Putih ⬛⬜)\n" +
-          "- `warna` (cetak Full Color 🌈)\n" +
-          "- `1-5` (Halaman `1-5` Hitam Putih, sisanya warna 🔢)\n" +
-          "- `1,3,5` (Halaman `1 dan 3 dan 5` Hitam Putih, sisanya Full Color)\n\n" +
-          "Contoh Teks Gambar:\n" +
-          "- `hitam` (cetak Hitam Putih ⬛⬜)\n" +
-          "- `warna` (cetak Full Color 🌈)\n" +
-          "🔚 Ketik 0 batal",
+        "👋 Selamat datang di layanan PrinPrinan!\n\n" +
+          "Untuk memulai, silakan ketik *nama Anda* untuk dicatat pada pesanan.",
       );
     } else {
       await chat.unarchive();
@@ -143,6 +188,25 @@ client.on("message_create", async (msg) => {
   }
 
   switch (session.step) {
+    case "AWAITING_NAME":
+      session.customerName = text;
+      session.step = "AWAITING_FILES";
+      await client.sendMessage(
+        chatId,
+        `Terima kasih, *${text}*!\n\n` +
+          "📄 Sekarang, silakan kirim file Anda dengan *teks/caption* untuk pengaturan cetak.\n" +
+          "👉 Format file yang didukung: *PDF, DOCX, JPEG, PNG, TIFF*\n\n" +
+          `*Daftar Harga per Dokumen:*\n` +
+          `- Full Color: *Rp${PRICING.COLOR.toLocaleString("id-ID")}*\n` +
+          `- Hitam Putih: *Rp${PRICING.BLACK_WHITE.toLocaleString("id-ID")}*\n\n` +
+          "Contoh Teks Caption:\n" +
+          "- `hitam` (cetak Hitam Putih ⬛⬜)\n" +
+          "- `warna` (cetak Full Color 🌈)\n" +
+          "- `1-5` (Halaman `1-5` Hitam Putih, sisanya warna 🔢)\n\n" +
+          "🔚 Ketik 0 batal",
+      );
+      break;
+
     case "AWAITING_FILES":
       if (msg.hasMedia) {
         const attachmentData = await msg.downloadMedia();
@@ -162,13 +226,14 @@ client.on("message_create", async (msg) => {
           config: validConfig || undefined,
         });
 
+        const fileTypeDisplay = getFileTypeDisplay(attachmentData.mimetype);
         const confirmationText = validConfig
           ? `Warna Dokumen: *${formatConfigDisplay(validConfig)}*`
           : `Warna Dokumen: Pilih Nanti ⌨️`;
 
         await client.sendMessage(
           chatId,
-          `File ${attachmentData.mimetype === "application/pdf" ? "PDF Diterima 📄" : "Gambar Diterima 🖼️"}:\n\n\`${fileName}\`\n\n${confirmationText}\n` +
+          `${fileTypeDisplay} Diterima:\n\n\`${fileName}\`\n\n${confirmationText}\n` +
             `Total: *${session.files.length} file.*\n\n` +
             `👉 Silakan kirim file lain.\n👉 Ketik *2* jika selesai.`,
         );
@@ -215,7 +280,6 @@ client.on("message_create", async (msg) => {
       }
 
       session.files[session.configIndex].config = validConfig;
-
       const nextUnsetIndex = session.files.findIndex((f) => !f.config);
 
       if (nextUnsetIndex !== -1) {
@@ -230,7 +294,6 @@ client.on("message_create", async (msg) => {
 
 async function finalizeOrder(chatId: string, session: UserState) {
   const firstUnsetIndex = session.files.findIndex((f) => !f.config);
-
   if (firstUnsetIndex === -1) {
     await generateSummaryAndQr(chatId, session);
   } else {
@@ -248,20 +311,21 @@ async function promptForUnsetConfig(chatId: string, session: UserState) {
   if (session.configIndex === undefined) return;
   const fileToConfig = session.files[session.configIndex];
 
-  const colorOption =
-    fileToConfig.filename.split(".").pop() === "pdf"
-      ? "- `hitam` (cetak Hitam Putih ⬛⬜)\n" +
-        "- `warna` (cetak Full Color 🌈)\n" +
-        "- `1-5` (Halaman `1-5` Hitam Putih, sisanya warna 🔢)\n" +
-        "- `1,3,5` (Halaman `1 dan 3 dan 5` Hitam Putih, sisanya Full Color)\n" +
-        "🔚 Ketik 0 batal"
-      : "- `hitam` (cetak Hitam Putih ⬛⬜)\n" +
-        "- `warna` (cetak Full Color 🌈)\n" +
-        "🔚 Ketik 0 batal";
+  const isDocument = [
+    "application/pdf",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ].includes(fileToConfig.mime);
+
+  const colorOption = isDocument
+    ? "- `hitam` (cetak Hitam Putih ⬛⬜)\n" +
+      "- `warna` (cetak Full Color 🌈)\n" +
+      "- `1-5` (Halaman `1-5` Hitam Putih, sisanya warna 🔢)\n"
+    : "- `hitam` (cetak Hitam Putih ⬛⬜)\n" +
+      "- `warna` (cetak Full Color 🌈)\n";
 
   await client.sendMessage(
     chatId,
-    `⚙️ Pilih Warna Cetakan (Tipe File: ${fileToConfig.filename.split(".").pop() === "pdf" ? "Dokumen PDF 📄" : "Gambar 🖼️"}):\n\n\`${fileToConfig.filename}\`\n\n` +
+    `⚙️ Pilih Warna Cetakan (Tipe File: ${getFileTypeDisplay(fileToConfig.mime)}):\n\n\`${fileToConfig.filename}\`\n\n` +
       `Ketik:\n` +
       colorOption,
   );
@@ -273,16 +337,8 @@ async function generateSummaryAndQr(chatId: string, session: UserState) {
     "🔃 Sedang Memproses Order Pesanan Anda. Ditunggu Yah...",
   );
 
-  const summaryMessage = session.files
-    .map((file, index) => {
-      return `${index + 1}. \`${file.filename}\`\n- Pengaturan: *${formatConfigDisplay(file.config)}*\n`;
-    })
-    .join("\n");
-
-  await client.sendMessage(
-    chatId,
-    `*Ringkasan Pesanan Anda:*\n\n${summaryMessage}`,
-  );
+  const invoiceMessage = generateInvoice(session);
+  await client.sendMessage(chatId, invoiceMessage);
 
   try {
     const qrDataUrl = await QRCode.toDataURL("Hello world", {
@@ -310,6 +366,7 @@ async function generateSummaryAndQr(chatId: string, session: UserState) {
       chatId: chatId,
       payload: {
         user: chatId.replace("@c.us", ""),
+        customerName: session.customerName,
         items: session.files,
         expires: Date.now() + 48 * 60 * 60 * 1000,
       },
