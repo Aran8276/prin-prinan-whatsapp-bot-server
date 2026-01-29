@@ -38,6 +38,8 @@ if (cluster.isPrimary) {
     scale?: "fit" | "noscale" | "shrink";
     side?: "duplex" | "duplexshort" | "duplexlong" | "simplex";
     pagesToPrint?: string;
+    totalFilePages: number;
+    calculatedPages: number;
   };
 
   type UserState = {
@@ -84,9 +86,62 @@ if (cluster.isPrimary) {
 
   client.on("disconnected", (reason) => {
     console.log("Client was logged out or disconnected:", reason);
-
     process.exit(1);
   });
+
+  const getPageCountFromPrinter = async (
+    fileData: File,
+    filename: string,
+  ): Promise<number> => {
+    try {
+      const formData = new FormData();
+      formData.append("file", fileData, filename);
+
+      const response = await fetch(
+        process.env.PAGE_CHECK_URL + "count-pages",
+        {
+          method: "POST",
+          body: formData,
+        },
+      );
+
+      if (!response.ok) {
+        return 1;
+      }
+
+      const result = await response.json();
+      return result.pages || 1;
+    } catch (e) {
+      return 1;
+    }
+  };
+
+  const calculatePageCountFromRange = (
+    rangeStr: string | undefined,
+    totalFilePages: number,
+  ): number => {
+    if (!rangeStr) return totalFilePages;
+
+    try {
+      const parts = rangeStr.split(",");
+      let count = 0;
+      for (const part of parts) {
+        if (part.includes("-")) {
+          const [start, end] = part.split("-").map((x) => parseInt(x.trim()));
+          if (!isNaN(start) && !isNaN(end) && end >= start) {
+            count += end - start + 1;
+          }
+        } else {
+          if (!isNaN(parseInt(part.trim()))) {
+            count++;
+          }
+        }
+      }
+      return count > 0 ? count : totalFilePages;
+    } catch {
+      return totalFilePages;
+    }
+  };
 
   const validateConfig = (text: string) => {
     const lower = text.toLowerCase();
@@ -185,8 +240,11 @@ if (cluster.isPrimary) {
     return `Hitam Putih (Halaman: ${config}) 📄`;
   };
 
-  const getItemPrice = (config?: string) => {
-    return config === "FULL_COLOR" ? PRICING.COLOR : PRICING.BLACK_WHITE;
+  const getItemPrice = (file: FileData) => {
+    const price =
+      file.config === "FULL_COLOR" ? PRICING.COLOR : PRICING.BLACK_WHITE;
+    const copies = file.copies || 1;
+    return price * file.calculatedPages * copies;
   };
 
   const generateInvoice = (session: UserState) => {
@@ -196,17 +254,18 @@ if (cluster.isPrimary) {
 
     const items = session.files
       .map((file, index) => {
-        const price = getItemPrice(file.config);
+        const price = getItemPrice(file);
         totalPrice += price;
         const formattedPrice = `Rp${price.toLocaleString("id-ID")}`;
 
         const optionsSummary = [
           `Pengaturan: *${formatConfigDisplay(file.config)}*`,
+          `Halaman: *${file.calculatedPages}* (Total: ${file.totalFilePages})`,
           file.copies && `Salinan: *${file.copies}*`,
           file.paperSize && `Kertas: *${file.paperSize}*`,
           file.scale && `Skala: *${file.scale}*`,
           file.side && `Sisi: *${file.side}*`,
-          file.pagesToPrint && `Halaman: *${file.pagesToPrint}*`,
+          file.pagesToPrint && `Range: *${file.pagesToPrint}*`,
         ]
           .filter(Boolean)
           .join("\n   - ");
@@ -313,7 +372,7 @@ if (cluster.isPrimary) {
           `Terima kasih, *${text}*!\n\n` +
             "📄 Sekarang, silakan kirim file Anda dengan *teks/caption* untuk pengaturan cetak.\n" +
             "👉 Format file yang didukung: *PDF, DOCX, JPEG, PNG, TIFF*\n\n" +
-            `*Daftar Harga per Dokumen:*\n` +
+            `*Daftar Harga per Halaman:*\n` +
             `- Full Color: *Rp${PRICING.COLOR.toLocaleString("id-ID")}*\n` +
             `- Hitam Putih: *Rp${PRICING.BLACK_WHITE.toLocaleString(
               "id-ID",
@@ -339,6 +398,16 @@ if (cluster.isPrimary) {
           const caption = msg.body.trim();
           const parsedOptions = parseCaption(caption);
 
+          const rawPageCount = await getPageCountFromPrinter(
+            fileObject,
+            fileName,
+          );
+
+          const actualPages = calculatePageCountFromRange(
+            parsedOptions.pagesToPrint,
+            rawPageCount,
+          );
+
           const newFile: FileData = {
             filename: fileName,
             mime: attachmentData.mimetype,
@@ -349,12 +418,15 @@ if (cluster.isPrimary) {
             scale: parsedOptions.scale,
             side: parsedOptions.side,
             pagesToPrint: parsedOptions.pagesToPrint,
+            totalFilePages: rawPageCount,
+            calculatedPages: actualPages,
           };
           session.files.push(newFile);
 
           const generateFileSummary = (file: FileData) => {
             const summary = [
               `Warna Dokumen: *${formatConfigDisplay(file.config)}*`,
+              `Halaman: *${file.calculatedPages}* (Total: ${file.totalFilePages})`,
             ];
             if (file.copies) summary.push(`Jumlah Salinan: *${file.copies}*`);
             if (file.paperSize)
@@ -362,7 +434,7 @@ if (cluster.isPrimary) {
             if (file.scale) summary.push(`Skala: *${file.scale}*`);
             if (file.side) summary.push(`Sisi Cetak: *${file.side}*`);
             if (file.pagesToPrint)
-              summary.push(`Halaman Cetak: *${file.pagesToPrint}*`);
+              summary.push(`Range Cetak: *${file.pagesToPrint}*`);
             return summary.join("\n");
           };
 
