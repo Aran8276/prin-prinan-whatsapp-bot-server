@@ -24,8 +24,8 @@ if (cluster.isPrimary) {
   const { Client, LocalAuth, MessageMedia } = pkg;
 
   const PRICING = {
-    COLOR: 2000,
-    BLACK_WHITE: 1000,
+    COLOR: 1000,
+    BLACK_WHITE: 500,
   };
 
   type FileData = {
