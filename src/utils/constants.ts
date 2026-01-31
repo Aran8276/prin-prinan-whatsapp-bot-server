@@ -1,0 +1,18 @@
+export const GREETINGS = [
+  "halo",
+  "hai",
+  "hi",
+  "helo",
+  "pagi",
+  "siang",
+  "sore",
+  "malam",
+  "assalamualaikum",
+  "punten",
+  "permisi",
+  "tes",
+  "test",
+  "cek",
+  "ping",
+  "p",
+];
