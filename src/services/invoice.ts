@@ -3,9 +3,18 @@ import type { FileData, UserState } from "../types.ts";
 import { formatConfigDisplay } from "../utils/helpers.ts";
 
 export const getItemPrice = (file: FileData) => {
-  const price =
-    file.config === "FULL_COLOR" ? PRICING.COLOR : PRICING.BLACK_WHITE;
   const copies = file.copies || 1;
+
+  // If we have a custom price (from API detection), use it
+  if (file.customPrice !== undefined) {
+    return file.customPrice * copies;
+  }
+
+  // Fallback / Standard B&W Logic
+  const price = file.config === "FULL_COLOR" 
+    ? PRICING.COLOR // This case theoretically runs if API fails
+    : PRICING.BLACK_WHITE;
+    
   return price * file.calculatedPages * copies;
 };
 

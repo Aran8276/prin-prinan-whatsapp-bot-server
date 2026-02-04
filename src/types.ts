@@ -10,6 +10,8 @@ export type FileData = {
   pagesToPrint?: string;
   totalFilePages: number;
   calculatedPages: number;
+  // Stores the price calculated from the external API for Color mode
+  customPrice?: number;
 };
 
 export type UserState = {

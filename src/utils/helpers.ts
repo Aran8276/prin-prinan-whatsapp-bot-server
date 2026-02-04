@@ -2,38 +2,70 @@ export const validateConfig = (text: string) => {
   const lower = text.toLowerCase();
   const isWarna = lower === "warna";
   const isHitam = lower === "hitam";
-  const isAuto = lower === "auto" || lower === "otomatis";
   const isRange = /^[\d\s,-]+$/.test(text);
 
-  if (!isWarna && !isHitam && !isRange && !isAuto) return null;
+  if (!isWarna && !isHitam && !isRange) return null;
   if (isWarna) return "FULL_COLOR";
   if (isHitam) return "BLACK_WHITE";
-  if (isAuto) return "AUTO_DETECT";
   return text;
+};
+
+export const getEffectivePageNumbers = (
+  rangeStr: string | undefined,
+  totalFilePages: number,
+): number[] => {
+  if (!rangeStr) return Array.from({ length: totalFilePages }, (_, i) => i + 1);
+
+  const pages = new Set<number>();
+  const parts = rangeStr.split(",");
+
+  for (const part of parts) {
+    if (part.includes("-")) {
+      const [start, end] = part.split("-").map((x) => parseInt(x.trim()));
+      if (!isNaN(start) && !isNaN(end) && end >= start) {
+        for (let i = start; i <= end; i++) {
+          if (i <= totalFilePages) pages.add(i);
+        }
+      }
+    } else {
+      const page = parseInt(part.trim());
+      if (!isNaN(page) && page <= totalFilePages) pages.add(page);
+    }
+  }
+
+  if (pages.size === 0) {
+    return Array.from({ length: totalFilePages }, (_, i) => i + 1);
+  }
+
+  return Array.from(pages).sort((a, b) => a - b);
+};
+
+export const formatPageRanges = (pages: number[]): string => {
+  if (pages.length === 0) return "-";
+  pages.sort((a, b) => a - b);
+  const ranges: string[] = [];
+  let start = pages[0];
+  let prev = pages[0];
+
+  for (let i = 1; i < pages.length; i++) {
+    if (pages[i] === prev + 1) {
+      prev = pages[i];
+    } else {
+      ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+      start = pages[i];
+      prev = pages[i];
+    }
+  }
+  ranges.push(start === prev ? `${start}` : `${start}-${prev}`);
+  return ranges.join(", ");
 };
 
 export const calculatePageCountFromRange = (
   rangeStr: string | undefined,
   totalFilePages: number,
 ): number => {
-  if (!rangeStr) return totalFilePages;
-  try {
-    const parts = rangeStr.split(",");
-    let count = 0;
-    for (const part of parts) {
-      if (part.includes("-")) {
-        const [start, end] = part.split("-").map((x) => parseInt(x.trim()));
-        if (!isNaN(start) && !isNaN(end) && end >= start) {
-          count += end - start + 1;
-        }
-      } else {
-        if (!isNaN(parseInt(part.trim()))) count++;
-      }
-    }
-    return count > 0 ? count : totalFilePages;
-  } catch {
-    return totalFilePages;
-  }
+  const pages = getEffectivePageNumbers(rangeStr, totalFilePages);
+  return pages.length;
 };
 
 export const parseCaption = (caption: string) => {
@@ -101,8 +133,6 @@ export const mapConfigToApiValue = (config?: string) => {
       return "color";
     case "BLACK_WHITE":
       return "bnw";
-    case "AUTO_DETECT":
-      return "auto";
     default:
       return "bnw";
   }
@@ -110,8 +140,7 @@ export const mapConfigToApiValue = (config?: string) => {
 
 export const formatConfigDisplay = (config?: string) => {
   if (!config) return "Belum Diatur ⚠️";
-  if (config === "FULL_COLOR") return "Full Color 🌈";
+  if (config === "FULL_COLOR") return "Full Color (Deteksi Cerdas) 🌈";
   if (config === "BLACK_WHITE") return "Full Hitam Putih ⬛⬜";
-  if (config === "AUTO_DETECT") return "Deteksi Otomatis 🤖";
   return `Kustom (Halaman Hitam Putih: ${config}) 📄`;
 };

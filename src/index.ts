@@ -9,6 +9,7 @@ import {
   generateSummaryAndQr,
   processMediaMessage,
   promptForUnsetConfig,
+  calculateFilePrice // Import the helper
 } from "./features/printFlow.ts";
 import { fetchPricing } from "./services/api.ts";
 import { deleteSession, getSession, setSession } from "./store/session.ts";
@@ -113,7 +114,7 @@ if (cluster.isPrimary) {
           chatId,
           "👋 Selamat Datang di PrinPrinan!\n\n" +
             "📄 Silakan *kirim file* dokumen/foto yang ingin diprint.\n" +
-            "👉 Format: PDF, DOCX, JPG, PNG.\n\n" +
+            "👉 Format: PDF, DOCX, DOC, JPG, PNG.\n\n" +
             "ℹ️ Anda juga bisa langsung kirim file tanpa ketik 'print' untuk order selanjutnya.",
         );
         return;
@@ -166,12 +167,16 @@ if (cluster.isPrimary) {
         if (!validConfig) {
           await client.sendMessage(
             chatId,
-            `❌ Format salah. Ketik: \`warna\`, \`hitam\`, \`auto\`, atau range halaman (cth: 1-5).`,
+            `❌ Format salah. Ketik: \`warna\`, \`hitam\`, atau range halaman (cth: 1-5).`,
           );
           return;
         }
 
-        session.files[session.configIndex].config = validConfig;
+        const currentFile = session.files[session.configIndex];
+        currentFile.config = validConfig;
+
+        // Trigger price calculation (API call) here
+        await calculateFilePrice(currentFile, chatId);
 
         const nextUnsetIndex = session.files.findIndex((f) => !f.config);
         if (nextUnsetIndex !== -1) {

@@ -1,9 +1,14 @@
+import * as fs from 'node:fs/promises';
 import process from "node:process";
 import pkg from "whatsapp-web.js";
 import { client } from "../core/client.ts";
 import { PRICING, updatePricing } from "../store/pricing.ts";
 import type { UserState } from "../types.ts";
-import { mapConfigToApiValue } from "../utils/helpers.ts";
+import {
+  getEffectivePageNumbers,
+  mapConfigToApiValue,
+} from "../utils/helpers.ts";
+import path from "node:path";
 
 export const fetchPricing = async () => {
   try {
@@ -36,6 +41,81 @@ export const getPageCountFromPrinter = async (
     return result.pages || 1;
   } catch (e) {
     return 1;
+  }
+};
+
+export interface DetectResult {
+  price: number;
+  detectedPages: number;
+  bnwPages: number[];
+  colorPages: number[];
+}
+
+export const detectColorCosts = async (
+  fileData: File,
+  filename: string,
+  pagesToPrintRange: string | undefined,
+  totalFilePages: number,
+): Promise<DetectResult | null> => {
+  try {
+    const formData = new FormData();
+    formData.append("files", fileData, filename);
+
+    const response = await fetch("http://localhost:5000/detect", {
+      method: "POST",
+      body: formData,
+    });
+
+    if (!response.ok) return null;
+
+    // download
+    // const downloadRes = response.clone();
+// 
+    // const buffer = await downloadRes.arrayBuffer();
+    // const filePath = path.join(process.cwd(), filename);
+    // await fs.writeFile(filePath, Buffer.from(buffer));
+    // console.log(`File saved to: ${filePath}`);
+    // download
+
+    const json = await response.json();
+
+    if (!json.data || !json.data[0] || !json.data[0].colors) {
+      return null;
+    }
+
+    const fileInfo = json.data[0];
+    const detectedPagesData = fileInfo.colors;
+    const actualTotalPages = fileInfo.total_pages || totalFilePages;
+
+    const effectivePages = getEffectivePageNumbers(
+      pagesToPrintRange,
+      actualTotalPages,
+    );
+
+    let totalPrice = 0;
+    const bnwPages: number[] = [];
+    const colorPages: number[] = [];
+
+    for (const p of detectedPagesData) {
+      if (effectivePages.includes(p.page)) {
+        totalPrice += p.price;
+        if (p.color === "black_and_white") {
+          bnwPages.push(p.page);
+        } else {
+          colorPages.push(p.page);
+        }
+      }
+    }
+
+    return {
+      price: totalPrice,
+      detectedPages: actualTotalPages,
+      bnwPages,
+      colorPages,
+    };
+  } catch (error) {
+    console.error("Error detecting colors:", error);
+    return null;
   }
 };
 
