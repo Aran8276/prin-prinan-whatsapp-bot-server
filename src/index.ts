@@ -186,7 +186,6 @@ if (cluster.isPrimary) {
         const currentFile = session.files[session.configIndex];
         currentFile.config = validConfig;
 
-        await calculateFilePrice(currentFile, chatId);
         await askForPages(chatId, session);
         break;
 

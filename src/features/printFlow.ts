@@ -85,7 +85,9 @@ export async function askForCopies(chatId: string, session: UserState) {
   session.step = "AWAITING_COPIES";
   if (session.configIndex === undefined) return;
   const file = session.files[session.configIndex];
-  const progress = `(${session.configIndex + 1} dari ${session.files.length})`;
+  const progress = `(${session.configIndex + 1} dari ${
+    session.files.length
+  })`;
 
   const copiesOption =
     `- \`1\` (*Satu lembar per halaman*)\n` +
@@ -106,7 +108,9 @@ export async function askForPages(chatId: string, session: UserState) {
   session.step = "AWAITING_PAGES";
   if (session.configIndex === undefined) return;
   const file = session.files[session.configIndex];
-  const progress = `(${session.configIndex + 1} dari ${session.files.length})`;
+  const progress = `(${session.configIndex + 1} dari ${
+    session.files.length
+  })`;
 
   const selectPageOption =
     `- \`semua\` (*Semua Halaman*)\n` +
@@ -128,7 +132,9 @@ export async function askForEdit(chatId: string, session: UserState) {
   session.step = "AWAITING_EDIT";
   if (session.configIndex === undefined) return;
   const file = session.files[session.configIndex];
-  const progress = `(${session.configIndex + 1} dari ${session.files.length})`;
+  const progress = `(${session.configIndex + 1} dari ${
+    session.files.length
+  })`;
 
   const editOption =
     `- \`edit\` (akan dikenakan biaya Rp500 jika halaman yang di edit lebih dari 10 halaman)\n` +
@@ -193,10 +199,6 @@ export const processMediaMessage = async (
     calculatedPages: actualPages,
   };
 
-  if (newFile.config) {
-    await calculateFilePrice(newFile, chatId);
-  }
-
   session.files.push(newFile);
 
   await client.sendMessage(
@@ -259,8 +261,8 @@ export async function checkConfigsAndProceed(
     session.step = "CONFIGURING_UNSET_FILES";
     await promptForUnsetConfig(chatId, session);
   } else {
-    session.step = "AWAITING_COPIES";
-    await askForCopies(chatId, session);
+    session.step = "AWAITING_PAGES";
+    await askForPages(chatId, session);
   }
 }
 
