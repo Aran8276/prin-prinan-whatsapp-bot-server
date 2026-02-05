@@ -2,7 +2,7 @@ export type FileData = {
   filename: string;
   mime: string;
   config?: string;
-  data: File;
+  data: Blob;
   copies?: number;
   paperSize?: string;
   scale?: "fit" | "noscale" | "shrink";
@@ -24,6 +24,7 @@ export type UserState = {
     | "AWAITING_PAGES"
     | "AWAITING_EDIT"
     | "AWAITING_EDIT_NOTES";
+
   files: FileData[];
   customerName?: string;
   configIndex?: number;

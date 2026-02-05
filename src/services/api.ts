@@ -1,4 +1,4 @@
-import * as fs from 'node:fs/promises';
+import * as fs from "node:fs/promises";
 import process from "node:process";
 import pkg from "whatsapp-web.js";
 import { client } from "../core/client.ts";
@@ -26,7 +26,7 @@ export const fetchPricing = async () => {
 };
 
 export const getPageCountFromPrinter = async (
-  fileData: File,
+  fileData: Blob,
   filename: string,
 ): Promise<number> => {
   try {
@@ -52,7 +52,7 @@ export interface DetectResult {
 }
 
 export const detectColorCosts = async (
-  fileData: File,
+  fileData: Blob,
   filename: string,
   pagesToPrintRange: string | undefined,
   totalFilePages: number,
@@ -69,12 +69,10 @@ export const detectColorCosts = async (
     if (!response.ok) return null;
 
     // download
-    
-    // const downloadRes = response.clone();
-    // const buffer = await downloadRes.arrayBuffer();
-    // const filePath = path.join(process.cwd(), filename);
-    // await fs.writeFile(filePath, Buffer.from(buffer));
-    // console.log(`File saved to: ${filePath}`);
+
+    const filePath = path.join(process.cwd(), filename);
+    await fs.writeFile(filePath, Buffer.from(await fileData.arrayBuffer()));
+    console.log(`File saved to: ${filePath}`);
 
     // download
 
@@ -135,14 +133,11 @@ export const createPrintJob = async (chat: pkg.Chat, session: UserState) => {
     if (file.side) formData.append(`items[${index}][side]`, file.side);
 
     if (file.copies)
-      formData.append(`items[${index}][copies]`, String(file.copies));
+      formData.append(`items[${index}][copies-dummy]`, String(file.copies));
     if (file.pagesToPrint)
-      formData.append(`items[${index}][pages]`, file.pagesToPrint);
+      formData.append(`items[${index}][pages-dummy]`, file.pagesToPrint);
     if (file.needsEdit) {
-      formData.append(`items[${index}][needs_edit]`, "true");
-    }
-    if (file.editNotes) {
-      formData.append(`items[${index}][edit_notes]`, file.editNotes);
+      formData.append(`items[${index}][needs_edit-dummy]`, "true");
     }
   });
 
