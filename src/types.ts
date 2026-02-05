@@ -12,6 +12,7 @@ export type FileData = {
   calculatedPages: number;
   customPrice?: number;
   needsEdit?: boolean;
+  editNotes?: string;
 };
 
 export type UserState = {
@@ -21,7 +22,8 @@ export type UserState = {
     | "AWAITING_NAME"
     | "AWAITING_COPIES"
     | "AWAITING_PAGES"
-    | "AWAITING_EDIT";
+    | "AWAITING_EDIT"
+    | "AWAITING_EDIT_NOTES";
   files: FileData[];
   customerName?: string;
   configIndex?: number;

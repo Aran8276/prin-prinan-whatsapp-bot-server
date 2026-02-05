@@ -85,17 +85,19 @@ export async function askForCopies(chatId: string, session: UserState) {
   session.step = "AWAITING_COPIES";
   if (session.configIndex === undefined) return;
   const file = session.files[session.configIndex];
-  const progress = `(${session.configIndex + 1} dari ${session.files.length})`;
+  const progress = `(File ${session.configIndex + 1} dari ${
+    session.files.length
+  })`;
 
   const copiesOption =
-    `- \`1\` (*Satu lembar per halaman*)\n` +
-    `- \`2\` (Dua lembar per halaman)\n` +
+    `- \`1\` (*Satu salinan untuk setiap halaman*)\n` +
+    `- \`2\` (Dua salinan untuk setiap halaman)\n` +
     `- \`5\`\n` +
     `- \`10\`\n` +
-    `- \`...\`\n`;
+    `- \`...\`\n\n*Saran:* Jika ingin cetak sekali saja, ketik \`1\`\n`;
   await client.sendMessage(
     chatId,
-    `📄 Pilih Lembar ${progress} untuk file:\n\n\`${file.filename}\`\n\n` +
+    `📄 Pilih Salinan Dokumen ${progress} untuk file:\n\n\`${file.filename}\`\n\n` +
       `Contoh:\n` +
       copiesOption +
       `\n🔚 Ketik *0* untuk keluar atau mulai ulang.\n`,
@@ -106,7 +108,9 @@ export async function askForPages(chatId: string, session: UserState) {
   session.step = "AWAITING_PAGES";
   if (session.configIndex === undefined) return;
   const file = session.files[session.configIndex];
-  const progress = `(${session.configIndex + 1} dari ${session.files.length})`;
+  const progress = `(File ${session.configIndex + 1} dari ${
+    session.files.length
+  })`;
 
   const selectPageOption =
     `- \`semua\` (*Semua Halaman*)\n` +
@@ -114,7 +118,7 @@ export async function askForPages(chatId: string, session: UserState) {
     `- \`1,3,5\` (Halaman 1, 3 dan 5)\n` +
     `- \`1-5,10-15\` (Halaman 1 sampai 5, dan 10 sampai 15)\n` +
     `- \`12\` (Hanya Halaman 12 Saja)\n` +
-    `- \`1,3,4-6\` (Halaman 1, 3, dan 4 sampai 6)\n`;
+    `- \`1,3,4-6\` (Halaman 1, 3, dan 4 sampai 6)\n\n*Saran:* Jika ingin cetak semua halaman, ketik \`semua\`\n`;
   await client.sendMessage(
     chatId,
     `📖 Pilih Halaman Yang Di Cetak ${progress} untuk file:\n\n\`${file.filename}\`\n\n` +
@@ -128,7 +132,9 @@ export async function askForEdit(chatId: string, session: UserState) {
   session.step = "AWAITING_EDIT";
   if (session.configIndex === undefined) return;
   const file = session.files[session.configIndex];
-  const progress = `(${session.configIndex + 1} dari ${session.files.length})`;
+  const progress = `(File ${session.configIndex + 1} dari ${
+    session.files.length
+  })`;
 
   const editOption =
     `- \`edit\` (akan dikenakan biaya Rp500 jika halaman yang di edit lebih dari 10 halaman)\n` +
@@ -139,6 +145,21 @@ export async function askForEdit(chatId: string, session: UserState) {
     `📝 Pilih Request Edit ${progress} untuk file:\n\n\`${file.filename}\`\n\n` +
       `Contoh:\n` +
       editOption +
+      `\n🔚 Ketik *0* untuk keluar atau mulai ulang.\n`,
+  );
+}
+
+export async function askForEditNotes(chatId: string, session: UserState) {
+  session.step = "AWAITING_EDIT_NOTES";
+  if (session.configIndex === undefined) return;
+  const file = session.files[session.configIndex];
+  const progress = `(File ${session.configIndex + 1} dari ${
+    session.files.length
+  })`;
+  await client.sendMessage(
+    chatId,
+    `📝 Mohon ketik catatan/request edit ${progress} untuk file:\n\n\`${file.filename}\`\n\n` +
+      `Contoh: "Tolong hapus halaman 3 dan perbesar logo di halaman 1"\n` +
       `\n🔚 Ketik *0* untuk keluar atau mulai ulang.\n`,
   );
 }
@@ -207,7 +228,7 @@ export async function promptForUnsetConfig(chatId: string, session: UserState) {
   if (session.configIndex === undefined) return;
   const fileToConfig = session.files[session.configIndex];
 
-  const progress = `(${session.configIndex + 1} dari ${
+  const progress = `(File ${session.configIndex + 1} dari ${
     session.files.length
   } file)`;
 
@@ -244,8 +265,8 @@ export async function checkConfigsAndProceed(
     session.step = "CONFIGURING_UNSET_FILES";
     await promptForUnsetConfig(chatId, session);
   } else {
-    session.step = "AWAITING_COPIES";
-    await askForCopies(chatId, session);
+    session.step = "AWAITING_PAGES";
+    await askForPages(chatId, session);
   }
 }
 

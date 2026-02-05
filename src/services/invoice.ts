@@ -34,6 +34,8 @@ export const generateInvoice = (session: UserState) => {
         file.paperSize && `Kertas: *${file.paperSize}*`,
         file.scale && `Skala: *${file.scale}*`,
         file.side && `Sisi: *${file.side}*`,
+        file.needsEdit && `Request Edit: *YA*`,
+        file.editNotes && `Catatan Edit: *${file.editNotes}*`,
       ]
         .filter(Boolean)
         .join("\n   - ");

@@ -7,6 +7,7 @@ import {
   askForCopies,
   askForCustomerName,
   askForEdit,
+  askForEditNotes,
   askForPages,
   calculateFilePrice,
   checkConfigsAndProceed,
@@ -186,7 +187,7 @@ if (cluster.isPrimary) {
         currentFile.config = validConfig;
 
         await calculateFilePrice(currentFile, chatId);
-        await askForCopies(chatId, session);
+        await askForPages(chatId, session);
         break;
 
       case "AWAITING_NAME":
@@ -211,7 +212,7 @@ if (cluster.isPrimary) {
             return;
           }
           session.files[session.configIndex].copies = copies;
-          await askForPages(chatId, session);
+          await askForEdit(chatId, session);
         }
         break;
       case "AWAITING_PAGES":
@@ -244,7 +245,7 @@ if (cluster.isPrimary) {
             await calculateFilePrice(file, chatId);
           }
 
-          await askForEdit(chatId, session);
+          await askForCopies(chatId, session);
         }
         break;
 
@@ -261,8 +262,29 @@ if (cluster.isPrimary) {
           const file = session.files[session.configIndex];
           if (lowerText === "edit") {
             file.needsEdit = true;
-          }
+            await askForEditNotes(chatId, session);
+          } else {
+            session.configIndex++;
 
+            if (session.configIndex < session.files.length) {
+              const nextFile = session.files[session.configIndex];
+              if (!nextFile.config) {
+                session.step = "CONFIGURING_UNSET_FILES";
+                await promptForUnsetConfig(chatId, session);
+              } else {
+                session.step = "AWAITING_PAGES";
+                await askForPages(chatId, session);
+              }
+            } else {
+              await askForCustomerName(chatId, session);
+            }
+          }
+        }
+        break;
+      case "AWAITING_EDIT_NOTES":
+        if (session.configIndex !== undefined) {
+          const file = session.files[session.configIndex];
+          file.editNotes = text;
           session.configIndex++;
 
           if (session.configIndex < session.files.length) {
@@ -271,8 +293,8 @@ if (cluster.isPrimary) {
               session.step = "CONFIGURING_UNSET_FILES";
               await promptForUnsetConfig(chatId, session);
             } else {
-              session.step = "AWAITING_COPIES";
-              await askForCopies(chatId, session);
+              session.step = "AWAITING_PAGES";
+              await askForPages(chatId, session);
             }
           } else {
             await askForCustomerName(chatId, session);
