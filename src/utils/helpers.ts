@@ -195,7 +195,7 @@ export const mapConfigToApiValue = (config?: string) => {
 
 export const formatConfigDisplay = (config?: string) => {
   if (!config) return "Belum Diatur ⚠️";
-  if (config === "FULL_COLOR") return "Full Color (Deteksi Cerdas) 🌈";
+  if (config === "FULL_COLOR") return "Berwarna (Deteksi Cerdas) 🤖";
   if (config === "BLACK_WHITE") return "Full Hitam Putih ⬛⬜";
   return `Kustom (Halaman Hitam Putih: ${config}) 📄`;
 };

@@ -13,7 +13,6 @@ import { deleteSession } from "../store/session.ts";
 import type { FileData, UserState } from "../types.ts";
 import {
   calculatePageCountFromRange,
-  formatPageRanges,
   getEffectivePageNumbers,
   parseCaption,
 } from "../utils/helpers.ts";
@@ -45,17 +44,20 @@ export const calculateFilePrice = async (file: FileData, chatId: string) => {
         );
       }
 
-      const bnwStr = formatPageRanges(apiResult.bnwPages);
-      const colorStr = formatPageRanges(apiResult.colorPages);
+      const bnwCount = apiResult.bnwPages.length;
+      const colorCount = apiResult.colorPages.length;
+      const fullColorCount = apiResult.fullColorPages.length;
+
       const formattedPrice = `Rp${apiResult.price.toLocaleString("id-ID")}`;
 
       await client.sendMessage(
         chatId,
-        `✅ *Hasil Deteksi Warna*\n` +
-          `File: \`${file.filename}\`\n\n` +
-          `📄 *Hitam Putih*: ${bnwStr}\n` +
-          `🌈 *Berwarna*: ${colorStr}\n\n` +
-          `💰 *Estimasi Harga Satuan*: ${formattedPrice}`,
+        `🤖 Hasil Deteksi Warna\n\n` +
+          `\`${file.filename}\`\n\n` +
+          `📄 Hitam Putih: ${bnwCount} halaman\n` +
+          `🎨 Color: ${colorCount} halaman\n` +
+          `🌈 Full Color: ${fullColorCount} halaman\n\n` +
+          `Estimasi Harga: *${formattedPrice}*`,
       );
     } else {
       await client.sendMessage(
@@ -90,14 +92,14 @@ export async function askForCopies(chatId: string, session: UserState) {
   })`;
 
   const copiesOption =
-    `- \`1\` (*Satu lembar per halaman*)\n` +
-    `- \`2\` (Dua lembar per halaman)\n` +
+    `- \`1\` (*Satu salinan untuk setiap halaman*)\n` +
+    `- \`2\` (Dua salinan untuk setiap halaman)\n` +
     `- \`5\`\n` +
     `- \`10\`\n` +
-    `- \`...\`\n`;
+    `- \`...\`\n\n*Saran:* Jika ingin cetak sekali saja, ketik \`1\`\n`;
   await client.sendMessage(
     chatId,
-    `📄 Pilih Lembar ${progress} untuk file:\n\n\`${file.filename}\`\n\n` +
+    `📄 Pilih Salinan Dokumen ${progress} untuk file:\n\n\`${file.filename}\`\n\n` +
       `Contoh:\n` +
       copiesOption +
       `\n🔚 Ketik *0* untuk keluar atau mulai ulang.\n`,
@@ -118,7 +120,7 @@ export async function askForPages(chatId: string, session: UserState) {
     `- \`1,3,5\` (Halaman 1, 3 dan 5)\n` +
     `- \`1-5,10-15\` (Halaman 1 sampai 5, dan 10 sampai 15)\n` +
     `- \`12\` (Hanya Halaman 12 Saja)\n` +
-    `- \`1,3,4-6\` (Halaman 1, 3, dan 4 sampai 6)\n`;
+    `- \`1,3,4-6\` (Halaman 1, 3, dan 4 sampai 6)\n\n*Saran:* Jika ingin cetak semua halaman, ketik \`semua\`\n`;
   await client.sendMessage(
     chatId,
     `📖 Pilih Halaman Yang Di Cetak ${progress} untuk file:\n\n\`${file.filename}\`\n\n` +

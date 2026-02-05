@@ -49,6 +49,7 @@ export interface DetectResult {
   detectedPages: number;
   bnwPages: number[];
   colorPages: number[];
+  fullColorPages: number[];
 }
 
 export const detectColorCosts = async (
@@ -68,14 +69,6 @@ export const detectColorCosts = async (
 
     if (!response.ok) return null;
 
-    // download
-
-    const filePath = path.join(process.cwd(), filename);
-    await fs.writeFile(filePath, Buffer.from(await fileData.arrayBuffer()));
-    console.log(`File saved to: ${filePath}`);
-
-    // download
-
     const json = await response.json();
 
     if (!json.data || !json.data[0] || !json.data[0].colors) {
@@ -94,13 +87,19 @@ export const detectColorCosts = async (
     let totalPrice = 0;
     const bnwPages: number[] = [];
     const colorPages: number[] = [];
+    const fullColorPages: number[] = [];
 
     for (const p of detectedPagesData) {
       if (effectivePages.includes(p.page)) {
         totalPrice += p.price;
         if (p.color === "black_and_white") {
           bnwPages.push(p.page);
+        } else if (p.color === "color") {
+          colorPages.push(p.page);
+        } else if (p.color === "full_color") {
+          fullColorPages.push(p.page);
         } else {
+          // Fallback
           colorPages.push(p.page);
         }
       }
@@ -111,6 +110,7 @@ export const detectColorCosts = async (
       detectedPages: actualTotalPages,
       bnwPages,
       colorPages,
+      fullColorPages,
     };
   } catch (error) {
     console.error("Error detecting colors:", error);
@@ -138,6 +138,9 @@ export const createPrintJob = async (chat: pkg.Chat, session: UserState) => {
       formData.append(`items[${index}][pages-dummy]`, file.pagesToPrint);
     if (file.needsEdit) {
       formData.append(`items[${index}][needs_edit-dummy]`, "true");
+    }
+    if (file.editNotes) {
+      formData.append(`items[${index}][edit_notes-dummy]`, file.editNotes);
     }
   });
 
