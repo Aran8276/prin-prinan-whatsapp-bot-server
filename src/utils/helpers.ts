@@ -10,6 +10,61 @@ export const validateConfig = (text: string) => {
   return text;
 };
 
+export const validateColorSetting = (
+  text: string,
+): "FULL_COLOR" | "BLACK_WHITE" | null => {
+  const lower = text.toLowerCase();
+  if (lower === "warna") return "FULL_COLOR";
+  if (lower === "hitam") return "BLACK_WHITE";
+  return null;
+};
+
+export const validatePageRange = (
+  rangeStr: string,
+  totalFilePages: number,
+): boolean => {
+  if (!/^[\d\s,-]+$/.test(rangeStr)) {
+    return false;
+  }
+
+  const parts = rangeStr.split(",");
+
+  for (const part of parts) {
+    const trimmedPart = part.trim();
+    if (trimmedPart === "") continue;
+
+    if (trimmedPart.includes("-")) {
+      if (trimmedPart.split("-").length > 2) return false;
+
+      const [startStr, endStr] = trimmedPart.split("-").map((s) => s.trim());
+
+      if (startStr === "" || endStr === "") return false;
+
+      const start = parseInt(startStr);
+      const end = parseInt(endStr);
+
+      if (
+        isNaN(start) ||
+        isNaN(end) ||
+        start < 1 ||
+        end < 1 ||
+        end < start ||
+        start > totalFilePages ||
+        end > totalFilePages
+      ) {
+        return false;
+      }
+    } else {
+      const page = parseInt(trimmedPart);
+      if (isNaN(page) || page < 1 || page > totalFilePages) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+};
+
 export const getEffectivePageNumbers = (
   rangeStr: string | undefined,
   totalFilePages: number,

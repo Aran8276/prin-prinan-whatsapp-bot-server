@@ -19,7 +19,8 @@ import { deleteSession, getSession, setSession } from "./store/session.ts";
 import { GREETINGS } from "./utils/constants.ts";
 import {
   calculatePageCountFromRange,
-  validateConfig,
+  validateColorSetting,
+  validatePageRange,
 } from "./utils/helpers.ts";
 
 if (cluster.isPrimary) {
@@ -172,11 +173,11 @@ if (cluster.isPrimary) {
           return;
         }
 
-        const validConfig = validateConfig(text);
+        const validConfig = validateColorSetting(text);
         if (!validConfig) {
           await client.sendMessage(
             chatId,
-            `❌ Format salah. Ketik: \`warna\`, \`hitam\`, atau range halaman (cth: 1-5).`,
+            `⚠️ Input tidak valid. Mohon ketik *hitam* atau *warna*.\n\n🔚 Ketik *0* untuk keluar atau mulai ulang.`,
           );
           return;
         }
@@ -205,7 +206,7 @@ if (cluster.isPrimary) {
           if (isNaN(copies) || copies < 1) {
             await client.sendMessage(
               chatId,
-              "⚠️ Masukkan jumlah salinan yang valid (angka, minimal 1).",
+              "⚠️ Input tidak valid. Mohon masukkan jumlah lembar dalam bentuk angka (contoh: 1).\n\n🔚 Ketik *0* untuk keluar atau mulai ulang.",
             );
             return;
           }
@@ -216,6 +217,18 @@ if (cluster.isPrimary) {
       case "AWAITING_PAGES":
         if (session.configIndex !== undefined) {
           const file = session.files[session.configIndex];
+
+          if (
+            lowerText !== "semua" &&
+            !validatePageRange(text, file.totalFilePages)
+          ) {
+            await client.sendMessage(
+              chatId,
+              `⚠️ Format halaman tidak valid. Mohon masukkan format yang benar (contoh: \`1-5,7\`) dan pastikan nomor halaman tidak melebihi total halaman file (${file.totalFilePages}).\n\nAtau ketik *semua*.\n\n🔚 Ketik *0* untuk keluar atau mulai ulang.`,
+            );
+            return;
+          }
+
           if (lowerText.toLowerCase() === "semua") {
             file.pagesToPrint = undefined;
           } else {
@@ -237,6 +250,14 @@ if (cluster.isPrimary) {
 
       case "AWAITING_EDIT":
         if (session.configIndex !== undefined) {
+          if (lowerText !== "edit" && lowerText !== "otomatis") {
+            await client.sendMessage(
+              chatId,
+              "⚠️ Input tidak valid. Mohon ketik *edit* atau *otomatis*.\n\n🔚 Ketik *0* untuk keluar atau mulai ulang.",
+            );
+            return;
+          }
+
           const file = session.files[session.configIndex];
           if (lowerText === "edit") {
             file.needsEdit = true;
