@@ -69,12 +69,13 @@ export const detectColorCosts = async (
     if (!response.ok) return null;
 
     // download
+    
     // const downloadRes = response.clone();
-// 
     // const buffer = await downloadRes.arrayBuffer();
     // const filePath = path.join(process.cwd(), filename);
     // await fs.writeFile(filePath, Buffer.from(buffer));
     // console.log(`File saved to: ${filePath}`);
+
     // download
 
     const json = await response.json();
@@ -128,14 +129,18 @@ export const createPrintJob = async (chat: pkg.Chat, session: UserState) => {
   session.files.forEach((file, index) => {
     formData.append(`items[${index}][file]`, file.data, file.filename);
     formData.append(`items[${index}][color]`, mapConfigToApiValue(file.config));
-    if (file.copies)
-      formData.append(`items[${index}][copies]`, String(file.copies));
     if (file.paperSize)
       formData.append(`items[${index}][paper_size]`, file.paperSize);
     if (file.scale) formData.append(`items[${index}][scale]`, file.scale);
     if (file.side) formData.append(`items[${index}][side]`, file.side);
+
+    if (file.copies)
+      formData.append(`items[${index}][copies-dummy]`, String(file.copies));
     if (file.pagesToPrint)
-      formData.append(`items[${index}][pages]`, file.pagesToPrint);
+      formData.append(`items[${index}][pages-dummy]`, file.pagesToPrint);
+    if (file.needsEdit) {
+      formData.append(`items[${index}][needs_edit-dummy]`, "true");
+    }
   });
 
   const url = process.env.LARAVEL_URL + "api/print-job/create";

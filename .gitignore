@@ -36,3 +36,4 @@ public/media/
 # wwebjs files
 .wwebjs_cache
 .wwebjs_auth
+codebase.md

@@ -15,4 +15,5 @@ export const GREETINGS = [
   "cek",
   "ping",
   "p",
+  "mas",
 ];

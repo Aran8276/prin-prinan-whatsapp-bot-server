@@ -4,17 +4,23 @@ import process from "node:process";
 import qrcodeTerminal from "qrcode-terminal";
 import { client } from "./core/client.ts";
 import {
+  askForCopies,
   askForCustomerName,
+  askForEdit,
+  askForPages,
+  calculateFilePrice,
   checkConfigsAndProceed,
   generateSummaryAndQr,
   processMediaMessage,
   promptForUnsetConfig,
-  calculateFilePrice // Import the helper
 } from "./features/printFlow.ts";
 import { fetchPricing } from "./services/api.ts";
 import { deleteSession, getSession, setSession } from "./store/session.ts";
 import { GREETINGS } from "./utils/constants.ts";
-import { validateConfig } from "./utils/helpers.ts";
+import {
+  calculatePageCountFromRange,
+  validateConfig,
+} from "./utils/helpers.ts";
 
 if (cluster.isPrimary) {
   console.log(`[Primary] Master process running (PID: ${process.pid})`);
@@ -72,10 +78,15 @@ if (cluster.isPrimary) {
         await chat.unarchive();
         await client.sendMessage(
           chatId,
-          "❌ Sesi dibatalkan. Data dihapus & Chat di-unarchive.",
+          `🔚 Order PrinPrinan telah dibatalkan.\n\n` +
+            `Silakan kirim file lagi untuk mengajukan order baru. Terima Kasih 🙏`,
         );
       } else {
-        await client.sendMessage(chatId, "✅ Tidak ada sesi aktif.");
+        await client.sendMessage(
+          chatId,
+          "Selamat Datang di *PrinPrinan Self-Service* 🖨️\n\n" +
+            "Langsung kirim file print aja ya 🙏",
+        );
       }
       return;
     }
@@ -112,10 +123,8 @@ if (cluster.isPrimary) {
         await fetchPricing();
         await client.sendMessage(
           chatId,
-          "👋 Selamat Datang di PrinPrinan!\n\n" +
-            "📄 Silakan *kirim file* dokumen/foto yang ingin diprint.\n" +
-            "👉 Format: PDF, DOCX, DOC, JPG, PNG.\n\n" +
-            "ℹ️ Anda juga bisa langsung kirim file tanpa ketik 'print' untuk order selanjutnya.",
+          "Selamat Datang di *PrinPrinan Self-Service* 🖨️\n\n" +
+            "Langsung kirim file print aja ya 🙏",
         );
         return;
       }
@@ -124,8 +133,8 @@ if (cluster.isPrimary) {
         await chat.unarchive();
         await client.sendMessage(
           chatId,
-          "Halo! 👋 Ini adalah nomor resmi *PrinPrinan Self-Service*.\n\n" +
-            "Untuk nge-print, silakan ketik *print* atau *langsung kirim file* Anda di sini. 🖨️",
+          "Selamat Datang di *PrinPrinan Self-Service* 🖨️\n\n" +
+            "Langsung kirim file print aja ya 🙏",
         );
         return;
       }
@@ -175,16 +184,8 @@ if (cluster.isPrimary) {
         const currentFile = session.files[session.configIndex];
         currentFile.config = validConfig;
 
-        // Trigger price calculation (API call) here
         await calculateFilePrice(currentFile, chatId);
-
-        const nextUnsetIndex = session.files.findIndex((f) => !f.config);
-        if (nextUnsetIndex !== -1) {
-          session.configIndex = nextUnsetIndex;
-          await promptForUnsetConfig(chatId, session);
-        } else {
-          await askForCustomerName(chatId, session);
-        }
+        await askForCopies(chatId, session);
         break;
 
       case "AWAITING_NAME":
@@ -197,6 +198,65 @@ if (cluster.isPrimary) {
         }
         session.customerName = text;
         await generateSummaryAndQr(chat, chatId, session);
+        break;
+      case "AWAITING_COPIES":
+        if (session.configIndex !== undefined) {
+          const copies = parseInt(text, 10);
+          if (isNaN(copies) || copies < 1) {
+            await client.sendMessage(
+              chatId,
+              "⚠️ Masukkan jumlah salinan yang valid (angka, minimal 1).",
+            );
+            return;
+          }
+          session.files[session.configIndex].copies = copies;
+          await askForPages(chatId, session);
+        }
+        break;
+      case "AWAITING_PAGES":
+        if (session.configIndex !== undefined) {
+          const file = session.files[session.configIndex];
+          if (lowerText.toLowerCase() === "semua") {
+            file.pagesToPrint = undefined;
+          } else {
+            file.pagesToPrint = text;
+          }
+
+          file.calculatedPages = calculatePageCountFromRange(
+            file.pagesToPrint,
+            file.totalFilePages,
+          );
+
+          if (file.config) {
+            await calculateFilePrice(file, chatId);
+          }
+
+          await askForEdit(chatId, session);
+        }
+        break;
+
+      case "AWAITING_EDIT":
+        if (session.configIndex !== undefined) {
+          const file = session.files[session.configIndex];
+          if (lowerText === "edit") {
+            file.needsEdit = true;
+          }
+
+          session.configIndex++;
+
+          if (session.configIndex < session.files.length) {
+            const nextFile = session.files[session.configIndex];
+            if (!nextFile.config) {
+              session.step = "CONFIGURING_UNSET_FILES";
+              await promptForUnsetConfig(chatId, session);
+            } else {
+              session.step = "AWAITING_COPIES";
+              await askForCopies(chatId, session);
+            }
+          } else {
+            await askForCustomerName(chatId, session);
+          }
+        }
         break;
     }
   });

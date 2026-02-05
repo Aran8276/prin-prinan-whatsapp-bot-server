@@ -10,12 +10,18 @@ export type FileData = {
   pagesToPrint?: string;
   totalFilePages: number;
   calculatedPages: number;
-  // Stores the price calculated from the external API for Color mode
   customPrice?: number;
+  needsEdit?: boolean;
 };
 
 export type UserState = {
-  step: "AWAITING_FILES" | "CONFIGURING_UNSET_FILES" | "AWAITING_NAME";
+  step:
+    | "AWAITING_FILES"
+    | "CONFIGURING_UNSET_FILES"
+    | "AWAITING_NAME"
+    | "AWAITING_COPIES"
+    | "AWAITING_PAGES"
+    | "AWAITING_EDIT";
   files: FileData[];
   customerName?: string;
   configIndex?: number;
