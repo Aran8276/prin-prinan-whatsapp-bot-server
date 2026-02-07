@@ -171,21 +171,21 @@ export const processMediaMessage = async (
   chatId: string,
   session: UserState,
 ) => {
-  const attachmentData = await msg.downloadMedia();
+  const msgId = msg.id;
+  const msgById = await client.getMessageById(msgId.id)
+  const attachmentData = await msgById.downloadMedia();
+
   const fileName = attachmentData.filename || `file-${Date.now()}`;
+
   const buffer = Buffer.from(attachmentData.data, "base64");
-  const blob = new Blob([buffer], {
-    type: attachmentData.mimetype,
-  });
+
+  const blob = new Blob([buffer], {type: attachmentData.mimetype});
 
   const caption = msg.body.trim();
   const parsedOptions = parseCaption(caption);
 
   const rawPageCount = await getPageCountFromPrinter(blob, fileName);
-  const actualPages = calculatePageCountFromRange(
-    parsedOptions.pagesToPrint,
-    rawPageCount,
-  );
+  const actualPages = calculatePageCountFromRange(parsedOptions.pagesToPrint, rawPageCount);
 
   const newFile: FileData = {
     filename: fileName,
@@ -206,10 +206,10 @@ export const processMediaMessage = async (
   await client.sendMessage(
     chatId,
     `📩 File Diterima: \n\n\`${fileName}\`\n\n` +
-      `Total: *${session.files.length} file.*\n\n` +
-      `👉 Silakan kirim file lain.\n` +
-      `👉 Ketik *2* jika selesai.\n` +
-      `\n🔚 Ketik *0* untuk keluar atau mulai ulang.\n`,
+    `Total: *${session.files.length} file.*\n\n` +
+    `👉 Silakan kirim file lain.\n` +
+    `👉 Ketik *2* jika selesai.\n` +
+    `\n🔚 Ketik *0* untuk keluar atau mulai ulang.\n`,
   );
 };
 
