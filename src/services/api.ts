@@ -122,27 +122,36 @@ export const detectColorCosts = async (
 export const createPrintJob = async (chat: pkg.Chat, session: UserState) => {
   const formData = new FormData();
   const contact = await client.getContactById(chat.id._serialized);
+
+  let totalPrice = 0;
+  let totalPagesAllFiles = 0;
+
+  session.files.forEach((file) => {
+    const filePrice = file.customPrice || 0; 
+    const fileCopies = file.copies || 1;
+    
+    totalPrice += (filePrice * fileCopies);
+    totalPagesAllFiles += (file.calculatedPages * fileCopies);
+  });
+
   formData.append("customer_name", session.customerName || "N/A");
   formData.append("customer_number", contact.number);
+  formData.append("total_price", String(totalPrice));
+  formData.append("total_pages", String(totalPagesAllFiles));
+
   session.files.forEach((file, index) => {
     formData.append(`items[${index}][file]`, file.data, file.filename);
     formData.append(`items[${index}][color]`, mapConfigToApiValue(file.config));
-    formData.append(`items[${index}][needs_edit]`, String(file.needsEdit));
+    formData.append(`items[${index}][needs_edit]`, file.needsEdit ? "true" : "false");
     formData.append(`items[${index}][pages]`, String(file.calculatedPages));
+    formData.append(`items[${index}][copies]`, String(file.copies || 1));
+    formData.append(`items[${index}][price]`, String(file.customPrice || 0));
 
-    if (file.paperSize)
-      formData.append(`items[${index}][paper_size]`, file.paperSize);
+    if (file.paperSize) formData.append(`items[${index}][paper_size]`, file.paperSize);
     if (file.scale) formData.append(`items[${index}][scale]`, file.scale);
     if (file.side) formData.append(`items[${index}][side]`, file.side);
-
-    if (file.copies)
-      formData.append(`items[${index}][copies]`, String(file.copies));
-    if (file.pagesToPrint)
-      formData.append(`items[${index}][pages_to_print]`, file.pagesToPrint);
-
-    if (file.editNotes) {
-      formData.append(`items[${index}][edit_notes]`, file.editNotes);
-    }
+    if (file.pagesToPrint) formData.append(`items[${index}][pages_to_print]`, file.pagesToPrint);
+    if (file.editNotes) formData.append(`items[${index}][edit_notes]`, file.editNotes);
   });
 
   const url = process.env.LARAVEL_URL + "api/print-job/create";
@@ -154,9 +163,7 @@ export const createPrintJob = async (chat: pkg.Chat, session: UserState) => {
 
   if (!response.ok) {
     const errorData = await response.text();
-    throw new Error(
-      `API Error: ${response.status} ${response.statusText} - ${errorData}`,
-    );
+    throw new Error(`API Error: ${response.status} - ${errorData}`);
   }
   return await response.json();
 };
