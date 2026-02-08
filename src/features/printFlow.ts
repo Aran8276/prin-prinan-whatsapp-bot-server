@@ -228,9 +228,9 @@ export const processMediaMessage = async (
   session.files.push(newFile);
 
   // TODO: DEBUG: Write recieved file to storage
-  const filePath = path.join(process.cwd(), fileName);
-  await fs.writeFile(filePath, buffer);
-  console.log(`File saved to: ${filePath} (${buffer.length} bytes)`);
+  // const filePath = path.join(process.cwd(), fileName);
+  // await fs.writeFile(filePath, buffer);
+  // console.log(`File saved to: ${filePath} (${buffer.length} bytes)`);
 
    await client.sendMessage(
     chatId,
