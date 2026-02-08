@@ -1,3 +1,4 @@
+import * as fs from "node:fs/promises";
 import process from "node:process";
 import QRCode from "qrcode";
 import pkg from "whatsapp-web.js";
@@ -16,7 +17,7 @@ import {
   getEffectivePageNumbers,
   parseCaption,
 } from "../utils/helpers.ts";
-
+import path from "node:path";
 const { MessageMedia } = pkg;
 
 export const calculateFilePrice = async (file: FileData, chatId: string) => {
@@ -53,11 +54,11 @@ export const calculateFilePrice = async (file: FileData, chatId: string) => {
       await client.sendMessage(
         chatId,
         `🤖 Hasil Deteksi Warna\n\n` +
-          `\`${file.filename}\`\n\n` +
-          `📄 Hitam Putih: ${bnwCount} halaman\n` +
-          `🎨 Color: ${colorCount} halaman\n` +
-          `🌈 Full Color: ${fullColorCount} halaman\n\n` +
-          `Estimasi Harga: *${formattedPrice}*`,
+        `\`${file.filename}\`\n\n` +
+        `📄 Hitam Putih: ${bnwCount} halaman\n` +
+        `🎨 Color: ${colorCount} halaman\n` +
+        `🌈 Full Color: ${fullColorCount} halaman\n\n` +
+        `Estimasi Harga: *${formattedPrice}*`,
       );
     } else {
       await client.sendMessage(
@@ -87,9 +88,8 @@ export async function askForCopies(chatId: string, session: UserState) {
   session.step = "AWAITING_COPIES";
   if (session.configIndex === undefined) return;
   const file = session.files[session.configIndex];
-  const progress = `(${session.configIndex + 1} dari ${
-    session.files.length
-  })`;
+  const progress = `(${session.configIndex + 1} dari ${session.files.length
+    })`;
 
   const copiesOption =
     `- \`1\` (*Satu salinan untuk setiap halaman*)\n` +
@@ -100,9 +100,9 @@ export async function askForCopies(chatId: string, session: UserState) {
   await client.sendMessage(
     chatId,
     `📄 Pilih Salinan Dokumen ${progress} untuk file:\n\n\`${file.filename}\`\n\n` +
-      `Contoh:\n` +
-      copiesOption +
-      `\n🔚 Ketik *0* untuk keluar atau mulai ulang.\n`,
+    `Contoh:\n` +
+    copiesOption +
+    `\n🔚 Ketik *0* untuk keluar atau mulai ulang.\n`,
   );
 }
 
@@ -110,9 +110,8 @@ export async function askForPages(chatId: string, session: UserState) {
   session.step = "AWAITING_PAGES";
   if (session.configIndex === undefined) return;
   const file = session.files[session.configIndex];
-  const progress = `(${session.configIndex + 1} dari ${
-    session.files.length
-  })`;
+  const progress = `(${session.configIndex + 1} dari ${session.files.length
+    })`;
 
   const selectPageOption =
     `- \`semua\` (*Semua Halaman*)\n` +
@@ -124,9 +123,9 @@ export async function askForPages(chatId: string, session: UserState) {
   await client.sendMessage(
     chatId,
     `📖 Pilih Halaman Yang Di Cetak ${progress} untuk file:\n\n\`${file.filename}\`\n\n` +
-      `Contoh:\n` +
-      selectPageOption +
-      `\n🔚 Ketik *0* untuk keluar atau mulai ulang.\n`,
+    `Contoh:\n` +
+    selectPageOption +
+    `\n🔚 Ketik *0* untuk keluar atau mulai ulang.\n`,
   );
 }
 
@@ -134,9 +133,8 @@ export async function askForEdit(chatId: string, session: UserState) {
   session.step = "AWAITING_EDIT";
   if (session.configIndex === undefined) return;
   const file = session.files[session.configIndex];
-  const progress = `(${session.configIndex + 1} dari ${
-    session.files.length
-  })`;
+  const progress = `(${session.configIndex + 1} dari ${session.files.length
+    })`;
 
   const editOption =
     `- \`edit\` (akan dikenakan biaya Rp500 jika halaman yang di edit lebih dari 10 halaman)\n` +
@@ -145,9 +143,9 @@ export async function askForEdit(chatId: string, session: UserState) {
   await client.sendMessage(
     chatId,
     `📝 Pilih Request Edit ${progress} untuk file:\n\n\`${file.filename}\`\n\n` +
-      `Contoh:\n` +
-      editOption +
-      `\n🔚 Ketik *0* untuk keluar atau mulai ulang.\n`,
+    `Contoh:\n` +
+    editOption +
+    `\n🔚 Ketik *0* untuk keluar atau mulai ulang.\n`,
   );
 }
 
@@ -155,14 +153,13 @@ export async function askForEditNotes(chatId: string, session: UserState) {
   session.step = "AWAITING_EDIT_NOTES";
   if (session.configIndex === undefined) return;
   const file = session.files[session.configIndex];
-  const progress = `(File ${session.configIndex + 1} dari ${
-    session.files.length
-  })`;
+  const progress = `(File ${session.configIndex + 1} dari ${session.files.length
+    })`;
   await client.sendMessage(
     chatId,
     `📝 Mohon ketik catatan/request edit ${progress} untuk file:\n\n\`${file.filename}\`\n\n` +
-      `Contoh: "Tolong hapus halaman 3 dan perbesar logo di halaman 1"\n` +
-      `\n🔚 Ketik *0* untuk keluar atau mulai ulang.\n`,
+    `Contoh: "Tolong hapus halaman 3 dan perbesar logo di halaman 1"\n` +
+    `\n🔚 Ketik *0* untuk keluar atau mulai ulang.\n`,
   );
 }
 
@@ -171,18 +168,45 @@ export const processMediaMessage = async (
   chatId: string,
   session: UserState,
 ) => {
-  const msgId = msg.id;
-  const msgById = await client.getMessageById(msgId.id)
-  const attachmentData = await msgById.downloadMedia();
+  let attachmentData = await msg.downloadMedia();
+  
+  if (!attachmentData || !attachmentData.data) {
+    console.error("Failed to download media on first attempt");
+  }
+
+  let buffer = Buffer.from(attachmentData.data || "", "base64");
+  let attempts = 0;
+  const maxAttempts = 3;
+
+  // compare the binary buffer length against the expected filesize from whatsapp
+  while (
+    attachmentData && 
+    attachmentData.filesize && 
+    buffer.length < attachmentData.filesize && 
+    attempts < maxAttempts
+  ) {
+    attempts++;
+    console.log(`[Retry ${attempts}] File truncated (${buffer.length}/${attachmentData.filesize}). Retrying in 2s...`);
+    
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // update the buffer with a new one
+    attachmentData = await msg.downloadMedia();
+    if (attachmentData && attachmentData.data) {
+        buffer = Buffer.from(attachmentData.data, "base64");
+    }
+  }
 
   const fileName = attachmentData.filename || `file-${Date.now()}`;
-
-  const buffer = Buffer.from(attachmentData.data, "base64");
-
-  const blob = new Blob([buffer], {type: attachmentData.mimetype});
+  const blob = new Blob([buffer], { type: attachmentData.mimetype });
 
   const caption = msg.body.trim();
   const parsedOptions = parseCaption(caption);
+
+  // TODO: DEBUG: Let the user know the final status
+  if (attachmentData.filesize && buffer.length < attachmentData.filesize) {
+     await msg.reply(`⚠️ Peringatan: Bot terkendala dalam mengunduh file. Mohon hubungi admin setelah menyelesaikan pesanan.\n\nOnly received ${buffer.length} of expected ${attachmentData.filesize} bytes.`);
+  }
 
   const rawPageCount = await getPageCountFromPrinter(blob, fileName);
   const actualPages = calculatePageCountFromRange(parsedOptions.pagesToPrint, rawPageCount);
@@ -203,7 +227,12 @@ export const processMediaMessage = async (
 
   session.files.push(newFile);
 
-  await client.sendMessage(
+  // TODO: DEBUG: Write recieved file to storage
+  const filePath = path.join(process.cwd(), fileName);
+  await fs.writeFile(filePath, buffer);
+  console.log(`File saved to: ${filePath} (${buffer.length} bytes)`);
+
+   await client.sendMessage(
     chatId,
     `📩 File Diterima: \n\n\`${fileName}\`\n\n` +
     `Total: *${session.files.length} file.*\n\n` +
@@ -211,6 +240,7 @@ export const processMediaMessage = async (
     `👉 Ketik *2* jika selesai.\n` +
     `\n🔚 Ketik *0* untuk keluar atau mulai ulang.\n`,
   );
+
 };
 
 export async function askForCustomerName(chatId: string, session: UserState) {
@@ -218,7 +248,7 @@ export async function askForCustomerName(chatId: string, session: UserState) {
   await client.sendMessage(
     chatId,
     "✅ Sip, pengaturan selesai!\n\n" +
-      "Terakhir, boleh minta nama Anda? (Akan dicetak di struk/antrian pembayaran manual)",
+    "Terakhir, boleh minta nama Anda? (Akan dicetak di struk/antrian pembayaran manual)",
   );
 }
 
@@ -226,9 +256,8 @@ export async function promptForUnsetConfig(chatId: string, session: UserState) {
   if (session.configIndex === undefined) return;
   const fileToConfig = session.files[session.configIndex];
 
-  const progress = `(${session.configIndex + 1} dari ${
-    session.files.length
-  } file)`;
+  const progress = `(${session.configIndex + 1} dari ${session.files.length
+    } file)`;
 
   const isDocument = [
     "application/pdf",
@@ -241,9 +270,9 @@ export async function promptForUnsetConfig(chatId: string, session: UserState) {
   await client.sendMessage(
     chatId,
     `🌈 Pilih Warna ${progress} untuk file:\n\n\`${fileToConfig.filename}\`\n\n` +
-      `Contoh:\n` +
-      colorOption +
-      `\n🔚 Ketik *0* untuk keluar atau mulai ulang.\n`,
+    `Contoh:\n` +
+    colorOption +
+    `\n🔚 Ketik *0* untuk keluar atau mulai ulang.\n`,
   );
 }
 
