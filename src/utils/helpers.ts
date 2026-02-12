@@ -129,7 +129,7 @@ export const parseCaption = (caption: string) => {
     copies?: number;
     paperSize?: string;
     scale?: "fit" | "noscale" | "shrink";
-    side?: "duplex" | "duplexshort" | "duplexlong" | "simplex";
+    // side?: "duplex" | "duplexshort" | "duplexlong" | "simplex";
     pagesToPrint?: string;
   } = {};
 
@@ -165,6 +165,7 @@ export const parseCaption = (caption: string) => {
           if (["fit", "noscale", "shrink"].includes(value.toLowerCase()))
             options.scale = value.toLowerCase() as typeof options.scale;
           break;
+        /*
         case "side":
           if (
             ["duplex", "duplexshort", "duplexlong", "simplex"].includes(
@@ -173,6 +174,7 @@ export const parseCaption = (caption: string) => {
           )
             options.side = value.toLowerCase() as typeof options.side;
           break;
+        */
         case "pages":
           options.pagesToPrint = value;
           break;

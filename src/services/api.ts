@@ -149,7 +149,7 @@ export const createPrintJob = async (chat: pkg.Chat, session: UserState) => {
 
     if (file.paperSize) formData.append(`items[${index}][paper_size]`, file.paperSize);
     if (file.scale) formData.append(`items[${index}][scale]`, file.scale);
-    if (file.side) formData.append(`items[${index}][side]`, file.side);
+    // if (file.side) formData.append(`items[${index}][side]`, file.side);
     if (file.pagesToPrint) formData.append(`items[${index}][pages_to_print]`, file.pagesToPrint);
     if (file.editNotes) formData.append(`items[${index}][edit_notes]`, file.editNotes);
   });

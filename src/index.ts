@@ -4,10 +4,12 @@ import process from "node:process";
 import qrcodeTerminal from "qrcode-terminal";
 import { client } from "./core/client.ts";
 import {
+  advanceToNextFileOrFinish,
   askForCopies,
   askForCustomerName,
   askForEdit,
   askForEditNotes,
+  askForFilePrintMode,
   askForPages,
   calculateFilePrice,
   checkConfigsAndProceed,
@@ -87,7 +89,7 @@ if (cluster.isPrimary) {
         await client.sendMessage(
           chatId,
           "Selamat Datang di *PrinPrinan Self-Service* 🖨️\n\n" +
-            "Langsung kirim file print aja ya 🙏",
+            "Untuk mengajukan order printer, mohon kirimkan filenya ya 🙏 🙏",
         );
       }
       return;
@@ -126,7 +128,7 @@ if (cluster.isPrimary) {
         await client.sendMessage(
           chatId,
           "Selamat Datang di *PrinPrinan Self-Service* 🖨️\n\n" +
-            "Langsung kirim file print aja ya 🙏",
+            "Untuk mengajukan order printer, mohon kirimkan filenya ya 🙏 🙏",
         );
         return;
       }
@@ -136,7 +138,7 @@ if (cluster.isPrimary) {
         await client.sendMessage(
           chatId,
           "Selamat Datang di *PrinPrinan Self-Service* 🖨️\n\n" +
-            "Langsung kirim file print aja ya 🙏",
+            "Untuk mengajukan order printer, mohon kirimkan filenya ya 🙏 🙏",
         );
         return;
       }
@@ -168,6 +170,32 @@ if (cluster.isPrimary) {
         }
         break;
 
+      case "AWAITING_FILE_MODE":
+        if (session.configIndex !== undefined) {
+          const file = session.files[session.configIndex];
+          const mode = lowerText.toLowerCase();
+
+          if (mode === "simpel" || mode === "1") {
+            file.mode = "simple";
+          } else if (mode === "lanjut" || mode === "2") {
+            file.mode = "advanced";
+          } else {
+            await client.sendMessage(
+              chatId,
+              `⚠️ Input tidak valid. Mohon ketik *simpel* atau *lanjut*.\n\n🔚 Ketik *0* untuk keluar atau mulai ulang.`,
+            );
+            return;
+          }
+
+          if (file.mode === "simple") {
+            await askForCopies(chatId, session);
+          } else {
+            // advanced
+            await askForPages(chatId, session);
+          }
+        }
+        break;
+
       case "CONFIGURING_UNSET_FILES":
         if (session.configIndex === undefined) {
           session.step = "AWAITING_FILES";
@@ -186,7 +214,7 @@ if (cluster.isPrimary) {
         const currentFile = session.files[session.configIndex];
         currentFile.config = validConfig;
 
-        await askForPages(chatId, session);
+        await askForFilePrintMode(chatId, session);
         break;
 
       case "AWAITING_NAME":
@@ -210,7 +238,9 @@ if (cluster.isPrimary) {
             );
             return;
           }
-          session.files[session.configIndex].copies = copies;
+          const file = session.files[session.configIndex];
+          file.copies = copies;
+
           await askForEdit(chatId, session);
         }
         break;
@@ -248,6 +278,30 @@ if (cluster.isPrimary) {
         }
         break;
 
+      /*
+      case "AWAITING_SIDE":
+        if (session.configIndex !== undefined) {
+          const sideInput = text.toLowerCase();
+          let sideValue: FileData["side"];
+
+          if (sideInput === "1" || sideInput.includes("satu")) {
+            sideValue = "simplex";
+          } else if (sideInput === "2" || sideInput.includes("bolak")) {
+            sideValue = "duplex";
+          } else {
+            await client.sendMessage(
+              chatId,
+              "⚠️ Input tidak valid. Mohon masukkan `1` untuk satu sisi atau `2` untuk bolak-balik.\n\n🔚 Ketik *0* untuk keluar atau mulai ulang.",
+            );
+            return;
+          }
+
+          session.files[session.configIndex].side = sideValue;
+          await askForEdit(chatId, session);
+        }
+        break;
+      */
+
       case "AWAITING_EDIT":
         if (session.configIndex !== undefined) {
           if (lowerText !== "edit" && lowerText !== "otomatis") {
@@ -263,20 +317,7 @@ if (cluster.isPrimary) {
             file.needsEdit = true;
             await askForEditNotes(chatId, session);
           } else {
-            session.configIndex++;
-
-            if (session.configIndex < session.files.length) {
-              const nextFile = session.files[session.configIndex];
-              if (!nextFile.config) {
-                session.step = "CONFIGURING_UNSET_FILES";
-                await promptForUnsetConfig(chatId, session);
-              } else {
-                session.step = "AWAITING_PAGES";
-                await askForPages(chatId, session);
-              }
-            } else {
-              await askForCustomerName(chatId, session);
-            }
+            await advanceToNextFileOrFinish(chatId, session);
           }
         }
         break;
@@ -284,20 +325,7 @@ if (cluster.isPrimary) {
         if (session.configIndex !== undefined) {
           const file = session.files[session.configIndex];
           file.editNotes = text;
-          session.configIndex++;
-
-          if (session.configIndex < session.files.length) {
-            const nextFile = session.files[session.configIndex];
-            if (!nextFile.config) {
-              session.step = "CONFIGURING_UNSET_FILES";
-              await promptForUnsetConfig(chatId, session);
-            } else {
-              session.step = "AWAITING_PAGES";
-              await askForPages(chatId, session);
-            }
-          } else {
-            await askForCustomerName(chatId, session);
-          }
+          await advanceToNextFileOrFinish(chatId, session);
         }
         break;
     }
