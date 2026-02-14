@@ -1,4 +1,4 @@
-import type { UserState } from "../types.ts";
+import type {UserState} from "../types.ts";
 
 export const userSessions: Record<string, UserState> = {};
 

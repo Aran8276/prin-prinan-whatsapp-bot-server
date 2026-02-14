@@ -1,4 +1,5 @@
 node_modules
+.idea
 # Keep environment variables out of version control
 .env
 
@@ -37,3 +38,6 @@ public/media/
 .wwebjs_cache
 .wwebjs_auth
 codebase.md
+
+## baileys
+.auth/

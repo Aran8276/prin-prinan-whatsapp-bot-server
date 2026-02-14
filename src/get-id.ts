@@ -1,66 +1,65 @@
-import fs from "fs";
-import path, { dirname } from "path";
+import makeWASocket, {
+  DisconnectReason,
+  downloadMediaMessage,
+  useMultiFileAuthState,
+} from "@whiskeysockets/baileys";
 import qrcode from "qrcode-terminal";
-import { fileURLToPath } from "url";
-import Whatsapp from "whatsapp-web.js";
 
-const { Client, LocalAuth } = Whatsapp;
+async function start() {
+  const { state, saveCreds } = await useMultiFileAuthState("./.auth/");
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+  const sock = makeWASocket({
+    auth: state,
+    // printQRInTerminal: true,
+  });
 
-const envPath = path.join(__dirname, "../.env");
-const key = "DEV_MODE_ID";
+  sock.ev.on("connection.update", (update) => {
+    const { connection, lastDisconnect, qr } = update;
 
-let envContent = "";
-if (fs.existsSync(envPath)) {
-  envContent = fs.readFileSync(envPath, "utf8");
+    if (qr) {
+      qrcode.generate(qr, { small: true });
+      console.log("Scan the QR above");
+    }
+
+    if (connection === "close") {
+      const shouldReconnect =
+          (lastDisconnect?.error as any)?.output?.statusCode !==
+          DisconnectReason.loggedOut;
+
+      console.log("Connection closed. Reconnecting:", shouldReconnect);
+
+      if (shouldReconnect) {
+        start();
+      }
+    } else if (connection === "open") {
+      console.log("Connected successfully");
+    }
+  });
+
+  sock.ev.on("creds.update", saveCreds);
+
+  sock.ev.on("messages.upsert", async ({ messages, type }) => {
+    if (type !== "notify") return;
+
+    const msg = messages[0];
+    if (!msg.message) return;
+    if (msg.key.fromMe) return;
+
+    const text =
+        msg.message.conversation || msg.message.extendedTextMessage?.text || "";
+
+    if (text.toLowerCase() === "ping") {
+      await sock.sendMessage(msg.key.remoteJid!, {
+        text: msg.id,
+      });
+    } else if(msg.message.imageMessage) {
+
+      console.log(msg.message.imageMessage)
+      await sock.sendMessage(msg.key.remoteJid!, {});
+    }else {
+      console.log(msg);
+    }
+  });
 }
 
-const client = new Client({
-  authStrategy: new LocalAuth({ clientId: "prin-prinan-official-whatsapp" }),
-  puppeteer: {
-    headless: true,
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-popup-blocking",
-      "--disable-dev-shm-usage",
-    ],
-  },
-  webVersionCache: {
-    type: "remote",
-    remotePath: `https://raw.githubusercontent.com/wppconnect-team/wa-version/refs/heads/main/html/2.3000.1031490220-alpha.html`,
-  },
-});
-
-client.on("qr", (qr) => {
-  qrcode.generate(qr, { small: true });
-});
-
-client.on("ready", () => {
-  console.log("Menunggu Pesan Pertama");
-});
-
-client.on("message_create", async (msg) => {
-  const payload = await msg.getChat();
-
-  console.log(`Message received with the text: ${msg.body}`);
-  console.warn(`YOUR ID IS: ${payload.id._serialized}`);
-
-  const newEntry = `${key}="${payload.id._serialized}"`;
-  const regex = new RegExp(`^${key}=.*`, "m");
-
-  if (regex.test(envContent)) {
-    envContent = envContent.replace(regex, newEntry);
-  } else {
-    envContent += `\n${newEntry}`;
-  }
-
-  fs.writeFileSync(envPath, envContent.trim() + "\n");
-  console.info(`Updated env ${key} to ${payload.id._serialized}`);
-
-  process.exit(0);
-});
-
-client.initialize();
+start();

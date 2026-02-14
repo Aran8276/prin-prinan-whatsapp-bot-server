@@ -1,12 +1,39 @@
-export type FileData = {
+import type { Boom } from "@hapi/boom";
+import type {
+  AuthenticationState,
+  SignalKeyStore,
+  WAMessage,
+} from "@whiskeysockets/baileys";
+
+export interface UserState {
+  step:
+      | "AWAITING_FILES"
+      | "AWAITING_FILE_MODE"
+      | "CONFIGURING_UNSET_FILES"
+      | "AWAITING_NAME"
+      | "AWAITING_COPIES"
+      | "AWAITING_PAGES"
+      | "AWAITING_EDIT"
+      | "AWAITING_EDIT_NOTES";
+  files: FileData[];
+  configIndex?: number;
+  customerName?: string;
+}
+
+export type ColorConfig =
+    | "BLACK_WHITE"
+    | "FULL_COLOR"
+    | string
+    | undefined;
+
+export interface FileData {
   filename: string;
   mime: string;
-  config?: string;
   data: Blob;
+  config: ColorConfig;
   copies?: number;
   paperSize?: string;
-  scale?: "fit" | "noscale" | "shrink";
-  // side?: "duplex" | "duplexshort" | "duplexlong" | "simplex";
+  scale?: string;
   pagesToPrint?: string;
   totalFilePages: number;
   calculatedPages: number;
@@ -14,25 +41,18 @@ export type FileData = {
   needsEdit?: boolean;
   editNotes?: string;
   mode?: "simple" | "advanced";
-};
+}
 
-export type UserState = {
-  step:
-    | "AWAITING_FILES"
-    | "CONFIGURING_UNSET_FILES"
-    | "AWAITING_NAME"
-    | "AWAITING_COPIES"
-    | "AWAITING_PAGES"
-    | "AWAITING_EDIT"
-    | "AWAITING_EDIT_NOTES"
-    | "AWAITING_FILE_MODE";
-
-  files: FileData[];
-  customerName?: string;
-  configIndex?: number;
-};
-
-export type PricingState = {
+export interface PricingState {
   COLOR: number;
+  FULL_COLOR: number;
   BLACK_WHITE: number;
+}
+
+export type ParsedCaption = {
+  colorConfig: ColorConfig;
+  copies: number | undefined;
+  paperSize: string | undefined;
+  scale: string | undefined;
+  pagesToPrint: string | undefined;
 };
