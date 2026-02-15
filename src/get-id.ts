@@ -1,16 +1,19 @@
 import makeWASocket, {
   DisconnectReason,
-  downloadMediaMessage,
   useMultiFileAuthState,
 } from "@whiskeysockets/baileys";
 import qrcode from "qrcode-terminal";
+import {pino} from "pino";
+import process from "node:process";
 
 async function start() {
   const { state, saveCreds } = await useMultiFileAuthState("./.auth/");
+  const devId = process.env.DEV_MODE_ID;
+  const isDevMode = process.env.DEV_MODE === "true";
 
   const sock = makeWASocket({
     auth: state,
-    // printQRInTerminal: true,
+    logger: pino({ level: "silent" }),
   });
 
   sock.ev.on("connection.update", (update) => {
@@ -48,16 +51,10 @@ async function start() {
     const text =
         msg.message.conversation || msg.message.extendedTextMessage?.text || "";
 
-    if (text.toLowerCase() === "ping") {
+    if (text.toLowerCase() === ".getid") {
       await sock.sendMessage(msg.key.remoteJid!, {
-        text: msg.id,
+        text: "Hi, *"+ msg.pushName+"*! \n Your user ID: `" + (msg.key.remoteJid ?? "unknown") +"` \n Alternative ID: `" + (msg.key.remoteJidAlt ?? "unknown") + "` \n" + isDevMode && "Development mode is currently on."
       });
-    } else if(msg.message.imageMessage) {
-
-      console.log(msg.message.imageMessage)
-      await sock.sendMessage(msg.key.remoteJid!, {});
-    }else {
-      console.log(msg);
     }
   });
 }

@@ -39,25 +39,28 @@ export async function initializeWhatsAppClient() {
       connectionStatus = "qr";
       console.log("QR code available, scan with your phone.");
     }
-    if (connection === "close") {
-      const shouldReconnect =
-          (lastDisconnect?.error as Boom)?.output?.statusCode !==
-          DisconnectReason.loggedOut;
-      connectionStatus = `closed, reconnecting: ${shouldReconnect}`;
-      console.log(
-          "Connection closed due to ",
-          lastDisconnect?.error,
-          ", reconnecting ",
-          shouldReconnect,
-      );
-      if (shouldReconnect) {
-        await initializeWhatsAppClient();
-      }
-    } else if (connection === "open") {
+
+    if (connection === "open") {
       connectionStatus = "connected";
-      console.log("Connection opened");
+      console.log("WhatsApp connected");
+      return;
     }
+
+    if (connection === "close") {
+      const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
+
+      if (
+          statusCode === DisconnectReason.loggedOut ||
+          statusCode === 440 // conflict
+      ) {
+        console.error("Session replaced. Exiting process.");
+        console.log("[INFO] If the process keep failing to start, check for exiting node process and try to stop it. Only one client is allowed to connect at the same time.");
+        process.exit(1);
+      }
+    }
+
   });
+
 
   return sock;
 }
