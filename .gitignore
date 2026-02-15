@@ -41,3 +41,5 @@ codebase.md
 
 ## baileys
 .auth/
+package-lock.json
+.wwebjs_backups

@@ -116,7 +116,7 @@ export const formatConfigDisplay = (config: ColorConfig): string => {
 };
 
 export const mapConfigToApiValue = (config: ColorConfig): string => {
-  if (config === "BLACK_WHITE") return "bnw";
+  if (config === "BLACK_WHITE") return "black_and_white";
   if (config === "FULL_COLOR") return "color";
   return "custom";
 };

@@ -1,15 +1,10 @@
 import makeWASocket, {
   useMultiFileAuthState,
   DisconnectReason,
-
-
-
 } from "@whiskeysockets/baileys";
-import type {WAMessageContent, WAMessageKey, downloadMediaMessage, WASocket} from "@whiskeysockets/baileys";
+import type {WASocket} from "@whiskeysockets/baileys";
 import { pino } from "pino";
 import QRCode from "qrcode";
-import * as fs from "node:fs/promises";
-import path from "node:path";
 import { Boom } from "@hapi/boom";
 
 let sock: WASocket;

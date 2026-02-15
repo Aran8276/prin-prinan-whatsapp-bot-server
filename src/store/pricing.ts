@@ -1,9 +1,9 @@
 import type { PricingState } from "../types.ts";
 
 export const PRICING: PricingState = {
+  BLACK_WHITE: 500,
   COLOR: 1000,
   FULL_COLOR: 1500,
-  BLACK_WHITE: 500,
 };
 
 export const updatePricing = ( color: number,fullColor: number, bnw: number) => {

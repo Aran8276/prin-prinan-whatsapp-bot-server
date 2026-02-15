@@ -40,7 +40,6 @@ async function main() {
             return;
         }
         if (type !== "notify") return;
-        console.log(msg);
 
         const chatId = msg.key.remoteJid;
         const devId = process.env.DEV_MODE_ID;
@@ -223,7 +222,7 @@ async function main() {
                         file.pagesToPrint,
                         file.totalFilePages,
                     );
-                    if (file.config) await calculateFilePrice(file, chatId);
+                    if (file.config) await calculateFilePrice(file, chatId, session);
                     await askForCopies(chatId, session);
                 }
                 break;

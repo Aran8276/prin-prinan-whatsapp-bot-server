@@ -7,6 +7,10 @@ export const getItemPrice = (file: FileData) => {
   if (file.customPrice !== undefined) {
     return file.customPrice * copies;
   }
+
+  console.log(JSON.stringify(file, null, 2));
+
+  console.info("Calculating price for file without customPrice (debug):", file);
   const price =
       file.config === "FULL_COLOR" ? PRICING.COLOR : PRICING.BLACK_WHITE;
   return price * file.calculatedPages * copies;

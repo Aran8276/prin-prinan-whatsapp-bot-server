@@ -1,6 +1,10 @@
-import {getEffectivePageNumbers, mapConfigToApiValue} from "../utils/helpers.ts";
-import type {UserState} from "../types.ts";
-import {PRICING, updatePricing} from "../store/pricing.ts";
+import { calculateFilePrice } from "../features/printFlow.ts";
+import { PRICING, updatePricing } from "../store/pricing.ts";
+import type { UserState } from "../types.ts";
+import {
+  getEffectivePageNumbers,
+  mapConfigToApiValue,
+} from "../utils/helpers.ts";
 
 export const fetchPricing = async () => {
   try {
@@ -10,9 +14,9 @@ export const fetchPricing = async () => {
     const apiResponse = await response.json();
     if (apiResponse.success && apiResponse.data.prices) {
       updatePricing(
-          apiResponse.data.prices.color,
-          apiResponse.data.prices.full_color,
-          apiResponse.data.prices.bnw,
+        apiResponse.data.prices.color,
+        apiResponse.data.prices.full_color,
+        apiResponse.data.prices.bnw,
       );
       console.log(`[Worker ${process.pid}] Pricing updated:`, PRICING);
     }
@@ -22,8 +26,8 @@ export const fetchPricing = async () => {
 };
 
 export const getPageCountFromPrinter = async (
-    fileData: Blob,
-    filename: string,
+  fileData: Blob,
+  filename: string,
 ): Promise<number> => {
   try {
     const formData = new FormData();
@@ -49,10 +53,10 @@ export interface DetectResult {
 }
 
 export const detectColorCosts = async (
-    fileData: Blob,
-    filename: string,
-    pagesToPrintRange: string | undefined,
-    totalFilePages: number,
+  fileData: Blob,
+  filename: string,
+  pagesToPrintRange: string | undefined,
+  totalFilePages: number,
 ): Promise<DetectResult | null> => {
   try {
     const formData = new FormData();
@@ -61,16 +65,19 @@ export const detectColorCosts = async (
       method: "POST",
       body: formData,
     });
+
     if (!response.ok) return null;
     const json = await response.json();
+    console.log(JSON.stringify(json, null, 2));
+
     if (!json.data || !json.data[0] || !json.data[0].colors) return null;
 
     const fileInfo = json.data[0];
     const detectedPagesData = fileInfo.colors;
     const actualTotalPages = fileInfo.total_pages || totalFilePages;
     const effectivePages = getEffectivePageNumbers(
-        pagesToPrintRange,
-        actualTotalPages,
+      pagesToPrintRange,
+      actualTotalPages,
     );
     let totalPrice = 0;
     const bnwPages: number[] = [];
@@ -80,7 +87,7 @@ export const detectColorCosts = async (
     for (const p of detectedPagesData) {
       if (effectivePages.includes(p.page)) {
         totalPrice += p.price;
-        if (p.color === "bnw") bnwPages.push(p.page);
+        if (p.color === "black_and_white") bnwPages.push(p.page);
         else if (p.color === "color") colorPages.push(p.page);
         else if (p.color === "full_color") fullColorPages.push(p.page);
         else colorPages.push(p.page);
@@ -99,37 +106,48 @@ export const detectColorCosts = async (
   }
 };
 
-export const createPrintJob = async (
-    chatId: string,
-    session: UserState,
-) => {
+export const createPrintJob = async (chatId: string, session: UserState) => {
   const formData = new FormData();
   const customerNumber = chatId.split("@")[0];
 
   let totalPrice = 0;
   let totalPagesAllFiles = 0;
 
-  session.files.forEach((file) => {
-    const filePrice = file.customPrice || 0;
-    const fileCopies = file.copies || 1;
-    totalPrice += filePrice * fileCopies;
-    totalPagesAllFiles += file.calculatedPages * fileCopies;
+  const pricePromises = session.files.map(async (file) => {
+    const copies = file.copies || 1;
+    const pages = (file.calculatedPages || 0) * copies;
+
+    let price = file.customPrice;
+
+    if (!price) {
+      price = await calculateFilePrice(file, chatId, session);
+    }
+
+    return {
+      subtotal: price * copies,
+      pages,
+    };
   });
+
+  const results = await Promise.all(pricePromises);
+
+  results.forEach(({ subtotal, pages }) => {
+    totalPrice += subtotal;
+    totalPagesAllFiles += pages;
+  });
+
+  formData.set("total_price", String(totalPrice));
 
   formData.append("customer_name", session.customerName || "N/A");
   formData.append("customer_number", customerNumber);
-  formData.append("total_price", String(totalPrice));
   formData.append("total_pages", String(totalPagesAllFiles));
 
   session.files.forEach((file, index) => {
     formData.append(`items[${index}][file]`, file.data, file.filename);
+    formData.append(`items[${index}][color]`, mapConfigToApiValue(file.config));
     formData.append(
-        `items[${index}][color]`,
-        mapConfigToApiValue(file.config),
-    );
-    formData.append(
-        `items[${index}][needs_edit]`,
-        file.needsEdit ? "true" : "false",
+      `items[${index}][needs_edit]`,
+      file.needsEdit ? "true" : "false",
     );
     formData.append(`items[${index}][pages]`, String(file.calculatedPages));
     formData.append(`items[${index}][copies]`, String(file.copies || 1));
@@ -144,6 +162,10 @@ export const createPrintJob = async (
   });
 
   const url = process.env.LARAVEL_URL + "api/print-job/create";
+
+  const formObject = Object.fromEntries(formData.entries());
+
+  console.log("DEBUG: CREATE PRINT JOB:", JSON.stringify(formObject, null, 2));
   const response = await fetch(url, {
     method: "POST",
     body: formData,
