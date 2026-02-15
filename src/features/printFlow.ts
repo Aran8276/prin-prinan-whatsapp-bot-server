@@ -324,6 +324,13 @@ export async function generateSummaryAndQr(chatId: string, session: UserState) {
   await sock.sendMessage(chatId, {
     text: "🔃 Sedang Memproses Order Pesanan Anda. Ditunggu Yah...",
   });
+
+  for (const file of session.files) {
+    if (file.config) {
+      await calculateFilePrice(file, chatId, session);
+    }
+  }
+
   const invoiceMessage = generateInvoice(session);
   try {
     const apiResponse = await createPrintJob(chatId, session);

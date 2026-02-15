@@ -1,2 +1,4 @@
 .wwebjs_auth
 .wwebjs_cache
+.auth
+.wwebjs_backups

@@ -1,4 +1,3 @@
-import { calculateFilePrice } from "../features/printFlow.ts";
 import { PRICING, updatePricing } from "../store/pricing.ts";
 import type { UserState } from "../types.ts";
 import {
@@ -113,28 +112,14 @@ export const createPrintJob = async (chatId: string, session: UserState) => {
   let totalPrice = 0;
   let totalPagesAllFiles = 0;
 
-  const pricePromises = session.files.map(async (file) => {
+  for (const file of session.files) {
     const copies = file.copies || 1;
     const pages = (file.calculatedPages || 0) * copies;
+    const price = file.customPrice || 0;
 
-    let price = file.customPrice;
-
-    if (!price) {
-      price = await calculateFilePrice(file, chatId, session);
-    }
-
-    return {
-      subtotal: price * copies,
-      pages,
-    };
-  });
-
-  const results = await Promise.all(pricePromises);
-
-  results.forEach(({ subtotal, pages }) => {
-    totalPrice += subtotal;
+    totalPrice += price * copies;
     totalPagesAllFiles += pages;
-  });
+  }
 
   formData.set("total_price", String(totalPrice));
 
