@@ -103,8 +103,8 @@ export async function askForCopies(chatId: string, session: UserState) {
   const file = session.files[session.configIndex];
   const progress = getProgressText(session);
   const copiesOption =
-    `- \`1\` (*Satu salinan untuk setiap halaman*)\n` +
-    `- \`2\` (Dua salinan untuk setiap halaman)\n` +
+    `- \`1\` (*Satu salinan*)\n` +
+    `- \`2\` (Dua salinan)\n` +
     `- \`5\`\n` +
     `- \`10\`\n` +
     `- \`...\`\n\n*Saran:* Jika ingin cetak sekali saja, ketik \`1\`\n`;
