@@ -28,7 +28,7 @@ export const generateInvoice = (session: UserState) => {
         const formattedPrice = `Rp${price.toLocaleString("id-ID")}`;
         const optionsSummary = [
           `Pengaturan: *${formatConfigDisplay(file.config)}*`,
-          `Halaman: *${file.calculatedPages}* (Total: ${file.totalFilePages})`,
+          `Total Halaman: *${file.calculatedPages}*`,
           file.copies && `Salinan: *${file.copies}*`,
           file.paperSize && `Kertas: *${file.paperSize}*`,
           file.scale && `Skala: *${file.scale}*`,
