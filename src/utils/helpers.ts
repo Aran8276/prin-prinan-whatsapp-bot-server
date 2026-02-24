@@ -45,18 +45,42 @@ export const validatePageRange = (
     rangeStr: string,
     total: number,
 ): boolean => {
-  if (!/^[0-9,-]+$/.test(rangeStr)) return false;
-  const parts = rangeStr.split(",");
+    if (!rangeStr.trim()) {
+    return false;
+  }
+
+  const pages = new Set<number>();
+  const parts = rangeStr.split(',');
+
   for (const part of parts) {
-    if (part.includes("-")) {
-      const [start, end] = part.split("-").map(Number);
-      if (isNaN(start) || isNaN(end) || start > end || start < 1 || end > total)
+    const trimmedPart = part.trim();
+    if (!trimmedPart) continue;
+
+    if (/^\d+-\d+$/.test(trimmedPart)) {
+      const [start, end] = trimmedPart.split('-').map(Number);
+      if (isNaN(start) || isNaN(end) || start <= 0 || end <= 0 || start > end) {
         return false;
+      }
+      if (end > total) {
+        return false;
+      }
+      for (let i = start; i <= end; i++) pages.add(i);
+    } else if (/^\d+$/.test(trimmedPart)) {
+      const page = Number(trimmedPart);
+      if (page <= 0)
+        return false;
+      if (page > total)
+        return false;
+      pages.add(page);
     } else {
-      const page = Number(part);
-      if (isNaN(page) || page < 1 || page > total) return false;
+      return false;
     }
   }
+
+  if (pages.size === 0) {
+    return false;
+  }
+
   return true;
 };
 
