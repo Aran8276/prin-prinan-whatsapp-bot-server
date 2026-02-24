@@ -16,6 +16,8 @@ import {
 } from "./features/printFlow.ts";
 import { fetchPricing } from "./services/api.ts";
 import { deleteSession, getSession, setSession } from "./store/session.ts";
+import express from 'express';
+import type { Request, Response } from 'express';
 import { GREETINGS } from "./utils/constants.ts";
 import {
   calculatePageCountFromRange,
@@ -60,6 +62,9 @@ if (!process.argv.includes("--worker")) {
 async function runApp() {
   async function main() {
     const sock = await initializeWhatsAppClient();
+    const app = express();
+    const PORT = process.env.PORT || 8080;
+
     fetchPricing();
 
     sock.ev.on("connection.update", (update) => {
@@ -71,6 +76,15 @@ async function runApp() {
         qrcodeTerminal.generate(qr, { small: true });
       }
       if (connection === "open") {
+        app.get('/', (req: Request, res: Response) => {
+          res.send('Hello World!');
+        });
+        app.listen(PORT, () => {
+          console.log(
+            `[Worker ${process.pid}] Server started on port ${PORT}`,
+          );
+        });
+
         console.log(
           `Server PrinPrinan Telah Jalan (PID: ${process.pid}) - Siap Melayani`,
         );
