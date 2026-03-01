@@ -13,7 +13,7 @@ async function start() {
 
   const sock = makeWASocket({
     auth: state,
-    logger: pino({ level: "silent" }),
+    logger: pino({}),
   });
 
   sock.ev.on("connection.update", (update) => {
@@ -29,7 +29,7 @@ async function start() {
           (lastDisconnect?.error as any)?.output?.statusCode !==
           DisconnectReason.loggedOut;
 
-      console.log("Connection closed. Reconnecting:", shouldReconnect);
+      console.log("Connection closed. lastdisconnect " + lastDisconnect?.error +". Reconnecting:", shouldReconnect);
 
       if (shouldReconnect) {
         start();

@@ -20,8 +20,7 @@ export async function initializeWhatsAppClient() {
 
   sock = makeWASocket({
     auth: state,
-    // printQRInTerminal: true,
-    logger: pino({ level: "silent" }),
+    logger: pino(),
     browser: ["PrinPrinan", "Chrome", "20.0.04"],
   });
 
@@ -45,15 +44,14 @@ export async function initializeWhatsAppClient() {
       const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
 
       if (
-          statusCode === DisconnectReason.loggedOut ||
-          statusCode === 440 // conflict
+          statusCode >= 400
       ) {
-        console.error("Session replaced. Exiting process.");
+           console.error("[CLOSED] Connection closed with status code: ", statusCode);
         console.log("[INFO] If the process keep failing to start, check for exiting node process and try to stop it. Only one client is allowed to connect at the same time.");
         process.exit(1);
       }
     }
-
+    
   });
 
 
